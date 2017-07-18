@@ -4,6 +4,7 @@ var mongoose = require('mongoose');
 var RtmClient = require('@slack/client').RtmClient;
 var bot_token = process.env.SLACK_BOT_TOKEN || '';
 var rtm = new RtmClient(bot_token);
+var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 
 rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
 
