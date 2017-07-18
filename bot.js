@@ -18,6 +18,7 @@ var connect = process.env.MONGODB_URI || '';
 mongoose.connect(connect);
 var models = require('./models');
 var User = models.User;
+var Reminder = models.Reminder;
 
 let channel;
 
@@ -57,8 +58,6 @@ function initClient() {
 }
 
 
-
-
 // curl: 'https://api.api.ai/api/query?v=20150910&query=Remind%20me%20to%20eat&lang=en&sessionId=7bb85bf1-182a-4cb1-af4f-d0eb0bff7aa4&timezone=2017-07-17T17:46:37-0700' -H 'Authorization:Bearer 6b8e724b1c5844e3afbf4232cb1686cc'
 
 // The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
@@ -70,9 +69,27 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 });
 
 // you need to wait for the client to fully connect before you can send messages
-// rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
-//     rtm.sendMessage("Beep.", channel);
-// });
+rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
+    // rtm.sendMessage("Beep.", channel);
+  var today = new Date().toISOString().substring(0, 10); // change today's date to 'yyyy-mm-dd' format
+  var tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10); // change tomorrow's date to 'yyyy-mm-dd' format
+  Reminder.find({date: {$in: [today, tomorrow]}}, function(err, reminders) { // find all reminders due today or tomorrow
+    console.log('here');
+    if (err) {
+      console.log(err);
+    }
+    else {
+      console.log('ALL REMINDERS:', reminders);
+      reminders.forEach((reminder) => {
+        console.log('rtm.getDMByUserId:', rtm.dataStore.getDMByUserId(reminder.userId));
+        var dm = rtm.dataStore.getDMByUserId(reminder.userId); // dm object by userId
+        var channel = rtm.dataStore.getDMByUserId(reminder.userId).id; // dm channel by userId
+        var date = (reminder.date === today? "today" : "tomorrow") // converts date to string 'today' or 'tomorrow'
+        rtm.sendMessage('Reminder: You need to ' + reminder.subject + ' ' + date, channel) // send message to DM
+      })
+    }
+  })
+});
 
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
@@ -90,7 +107,23 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       });
       newUser.save(function(err, user){
         if (err) {
-          res.send({failure: true, error: err});
+            res.send({failure: true, error: err});
+        }
+        else if (!user) {
+            var userInfo = rtm.dataStore.getUserById(message.user);
+            var newUser = new User({
+                slackId: message.user,
+                slackName: userInfo.name,
+                email: userInfo.profile.email
+            });
+            newUser.save(function(err, user){
+                if (err) {
+                    res.send({failure: true, error: err});
+                }
+                else {
+                    rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
+                }
+            })
         }
         else {
           rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
