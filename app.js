@@ -136,6 +136,7 @@ app.post('/slack/interactive', function(req, res) {
                 })
             }
             else {
+                // If the cancel button is pressed instead, cancel the event
                 var attachment = payload.original_message.attachments[0];
                 delete attachment.actions;
                 attachment.fallback = '';
