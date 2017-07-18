@@ -66,13 +66,31 @@ app.get('/connect/callback', function(req, res) {
 
 
 // Route to handle interactive message actions
-app.post('/slack/message_action', function(req, res) {
+app.post('/slack/interactive', function(req, res) {
     var payload = JSON.parse(req.body.payload);
-    console.log("PAYLOAD: ", payload)
+    console.log('BODY', payload);
     if (payload.actions[0].value === 'confirm') {
-        res.send('Created reminder :white_check_mark:');
-    } else {
-        res.send('Cancelled :x:');
+        var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
+        delete attachment.actions; // delete buttons
+        attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
+        attachment.color = '#53B987' // change the color to green
+        res.json({
+            replace_original: true, // replace the original interactive message box with a new messagee
+            text: 'Created reminder :white_check_mark:',
+            attachments: [attachment]
+        });
+    }
+    else {
+        var attachment = payload.original_message.attachments[0];
+        delete attachment.actions;
+        console.log(attachment);
+        attachment.text = 'Cancelled reminder';
+        attachment.color = '#DD4814'
+        res.json({
+            replace_original: true,
+            text: 'Cancelled reminder :x:',
+            attachments: [attachment]
+        });
     }
 });
 

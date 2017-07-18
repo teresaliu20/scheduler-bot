@@ -43,7 +43,7 @@ function handleClientLoad() {
 function initClient() {
 gapi.client.init({
     discoveryDocs: DISCOVERY_DOCS,
-    clientId: CLIENT_ID,
+    clientId: GOOGLE_CLIENT_ID,
     scope: SCOPES
 }).then(function () {
     // Listen for sign-in state changes.
@@ -70,9 +70,9 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 });
 
 // you need to wait for the client to fully connect before you can send messages
-rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
-    rtm.sendMessage("Beep.", channel);
-});
+// rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
+//     rtm.sendMessage("Beep.", channel);
+// });
 
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
