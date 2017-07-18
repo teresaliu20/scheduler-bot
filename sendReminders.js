@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-var Reminders = require('./models').Reminder;
+var Reminder = require('./models').Reminder;
 var mongoose = require('mongoose');
 var RtmClient = require('@slack/client').RtmClient;
 var bot_token = process.env.SLACK_BOT_TOKEN || '';
