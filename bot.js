@@ -102,8 +102,11 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             res.send({failure: true, error: err});
         }
         else if (!user) {
+            var userInfo = rtm.dataStore.getUserById(message.user);
             var newUser = new User({
-                slackId: message.user
+                slackId: message.user,
+                slackName: userInfo.name,
+                email: userInfo.profile.email
             });
             newUser.save(function(err, user){
                 if (err) {

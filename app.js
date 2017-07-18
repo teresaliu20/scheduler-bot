@@ -52,7 +52,7 @@ app.get('/connect/callback', function(req, res) {
                     res.send({success: false, error: err});
                 }
                 else {
-                    console.log(user);
+                    console.log('FOUND USER', user);
                     res.send({success: true});
                 }
             })
@@ -64,7 +64,6 @@ app.get('/connect/callback', function(req, res) {
     });
 
 })
-
 
 // Route to handle interactive message actions
 app.post('/slack/interactive', function(req, res) {
