@@ -105,19 +105,19 @@ app.post('/slack/interactive', function(req, res) {
                 });
 
                 // Retrieving the subject of the event in attachment fallback
-                var subject = // INSERT SUBJECT HERE
+                var subject// INSERT SUBJECT HERE
                 // Retrieving the date of the event in attachment pretext
-                var date = // INSERT DATE HERE
+                var date // INSERT DATE HERE
                 // Create the event for the Google Calendar API
                 let reminderEvent = {
-                    'summary': subject,
-                    'location': '',
-                    'description': '',
+                    'summary': 'test summary', // test data
+                    'location': '221 7th St, San Francisco', // test data
+                    'description': 'text Teresa',// test data
                     'start': {
-                        'date': date
+                        'date': '2017-07-18'// test data
                     },
                     'end': {
-                        'date': date
+                        'date': '2017-07-18'// test data
                     }
                 }
                 // Insert the event into the user's primary calendar
