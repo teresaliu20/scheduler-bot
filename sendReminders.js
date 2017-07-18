@@ -8,7 +8,7 @@ var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 
 rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
 
-    // rtm.sendMessage("Beep.", channel);
+  rtm.sendMessage("Beep.", 'D6AS82SQ6');
   var today = new Date().toISOString().substring(0, 10); // change today's date to 'yyyy-mm-dd' format
   var tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10); // change tomorrow's date to 'yyyy-mm-dd' format
   Reminder.find({date: {$in: [today, tomorrow]}}, function(err, reminders) { // find all reminders due today or tomorrow
