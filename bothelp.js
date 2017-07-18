@@ -10,9 +10,15 @@ var rtm = new RtmClient(bot_token);
 var web = new WebClient(bot_token);
 
 
-var response = function(parameters){
+var reminderResponse = function(parameters) {
   var dateStr = (new Date(parameters.date)).toDateString();
   var words = 'Creating reminder "' + parameters.subject + '" on ' + dateStr;
+  return words;
+}
+
+var meetingResponse = function(parameters) {
+  var dateStr = (new Date(parameters.date)).toDateString();
+  var words = 'Schedule a meeting with ' + parameters.invitees + ' about ' + parameters.subject + ' on ' + parameters.date + ' at ' + parameters.time;
   return words;
 }
 
@@ -43,15 +49,16 @@ var messageObject = {
   ]
 }
 
-var distinguish = function(data, message){
+var distinguish = function(data, message) {
   if (data.result.action === 'reminder:add'){
     messageObject.text="reminder";
+    web.chat.postMessage(message.channel, reminderResponse(data.result.parameters), messageObject);
   } else if (data.result.action === 'meeting:add'){
     messageObject.text="meeting";
+    web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
   } else {
     console.log('Action: ', data.result.action);
   }
-  web.chat.postMessage(message.channel, response(data.result.parameters), messageObject)
 }
 
 function meetOrRemind(data, message){

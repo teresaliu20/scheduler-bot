@@ -125,7 +125,6 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       });
     }
     else {
-      console.log(message);
       axios.get('https://api.api.ai/api/query', {
           params: {
             v: '20150910',

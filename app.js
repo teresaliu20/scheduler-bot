@@ -138,9 +138,6 @@ app.post('/slack/interactive', function(req, res) {
                 // If the cancel button is pressed instead, cancel the event
                 var attachment = payload.original_message.attachments[0];
                 delete attachment.actions;
-                attachment.fallback = '';
-                attachment.pretext = '';
-                console.log(attachment);
                 attachment.text = 'Cancelled reminder';
                 attachment.color = '#DD4814'
                 res.json({
@@ -152,7 +149,7 @@ app.post('/slack/interactive', function(req, res) {
             else if (payload.actions[0].value === 'confirm' && payload.original_message.text === 'meeting') {
 
             }
-            else if (payload.actions[0].value === 'cancel' && payload.original_message.text === 'reminder') {
+            else if (payload.actions[0].value === 'cancel' && payload.original_message.text === 'meeting') {
 
             }
         }
