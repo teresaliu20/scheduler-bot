@@ -2,7 +2,7 @@ var express = require('express');
 var app = express();
 var axios = require('axios');
 var path = require('path');
-require('./index.js');
+require('./bot.js');
 
 var bodyParser = require('body-parser');
 app.use(bodyParser.json());
