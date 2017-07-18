@@ -58,8 +58,6 @@ gapi.client.init({
 }
 
 
-
-
 // curl: 'https://api.api.ai/api/query?v=20150910&query=Remind%20me%20to%20eat&lang=en&sessionId=7bb85bf1-182a-4cb1-af4f-d0eb0bff7aa4&timezone=2017-07-17T17:46:37-0700' -H 'Authorization:Bearer 6b8e724b1c5844e3afbf4232cb1686cc'
 
 // The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
@@ -71,9 +69,27 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 });
 
 // you need to wait for the client to fully connect before you can send messages
-// rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
-//     rtm.sendMessage("Beep.", channel);
-// });
+rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
+    // rtm.sendMessage("Beep.", channel);
+  var today = new Date().toISOString().substring(0, 10); // change today's date to 'yyyy-mm-dd' format
+  var tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10); // change tomorrow's date to 'yyyy-mm-dd' format
+  Reminder.find({date: {$in: [today, tomorrow]}}, function(err, reminders) {
+    console.log('here');
+    if (err) {
+      console.log(err);
+    }
+    else {
+      console.log('ALL REMINDERS:', reminders);
+      reminders.forEach((reminder) => {
+        console.log('rtm.getDMByUserId:', rtm.dataStore.getDMByUserId(reminder.userId));
+        var dm = rtm.dataStore.getDMByUserId(reminder.userId);
+        var channel = rtm.dataStore.getDMByUserId(reminder.userId).id;
+        var date = (reminder.date === today? "today" : "tomorrow")
+        rtm.sendMessage('Reminder: You need to ' + reminder.subject + ' ' + date, channel)
+      })
+    }
+  })
+});
 
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
