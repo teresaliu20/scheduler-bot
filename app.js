@@ -93,7 +93,7 @@ app.post('/slack/interactive', function(req, res) {
                 'refresh_token': user.google.refresh_token
             });
             // If the user clicked confirm, create Google Calendar event
-            if (payload.actions[0].value === 'confirm') {
+            if (payload.actions[0].value === 'confirm' && payload.original_message.text === 'reminder') {
                 var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
                 delete attachment.actions; // delete buttons
                 attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
@@ -105,19 +105,19 @@ app.post('/slack/interactive', function(req, res) {
                 });
 
                 // Retrieving the subject of the event in attachment fallback
-                var subject = // INSERT SUBJECT HERE
+                // var subject = // INSERT SUBJECT HERE
                 // Retrieving the date of the event in attachment pretext
-                var date = // INSERT DATE HERE
+                // var date = // INSERT DATE HERE
                 // Create the event for the Google Calendar API
                 let reminderEvent = {
-                    'summary': subject,
+                    'summary': 'EVENT SUMMARY',
                     'location': '',
                     'description': '',
                     'start': {
-                        'date': date
+                        'date': '2017-06-19'
                     },
                     'end': {
-                        'date': date
+                        'date': '2017-06-19'
                     }
                 }
                 // Insert the event into the user's primary calendar
@@ -134,7 +134,7 @@ app.post('/slack/interactive', function(req, res) {
                     }
                 })
             }
-            else {
+            else if (payload.actions[0].value === 'cancel' && payload.original_message.text === 'reminder') {
                 // If the cancel button is pressed instead, cancel the event
                 var attachment = payload.original_message.attachments[0];
                 delete attachment.actions;
@@ -148,6 +148,12 @@ app.post('/slack/interactive', function(req, res) {
                     text: 'Cancelled reminder :x:',
                     attachments: [attachment]
                 });
+            }
+            else if (payload.actions[0].value === 'confirm' && payload.original_message.text === 'meeting') {
+
+            }
+            else if (payload.actions[0].value === 'cancel' && payload.original_message.text === 'reminder') {
+
             }
         }
     })

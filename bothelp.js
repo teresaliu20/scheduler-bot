@@ -45,9 +45,9 @@ var messageObject = {
 
 var distinguish = function(data, message){
   if (data.result.action === 'reminder:add'){
-    messageObject.text="Would you like to set this Reminder?";
+    messageObject.text="reminder";
   } else if (data.result.action === 'meeting:add'){
-    messageObject.text="Would you like to set the Meeting?";
+    messageObject.text="meeting";
   } else {
     console.log('Action: ', data.result.action);
   }
