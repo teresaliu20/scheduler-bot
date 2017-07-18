@@ -24,6 +24,7 @@ var connect = process.env.MONGODB_URI || '';
 mongoose.connect(connect);
 var models = require('./models');
 var User = models.User;
+var Reminder = models.Reminder;
 
 
 let channel;
@@ -40,7 +41,7 @@ var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/
 var SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 
 function handleClientLoad() {
-    gapi.load('client:auth2', initClient);
+  gapi.load('client:auth2', initClient);
 }
 
 /**
@@ -48,11 +49,11 @@ function handleClientLoad() {
 *  listeners.
 */
 function initClient() {
-gapi.client.init({
-    discoveryDocs: DISCOVERY_DOCS,
-    clientId: GOOGLE_CLIENT_ID,
-    scope: SCOPES
-}).then(function () {
+    gapi.client.init({
+      discoveryDocs: DISCOVERY_DOCS,
+      clientId: GOOGLE_CLIENT_ID,
+      scope: SCOPES
+  }).then(function () {
     // Listen for sign-in state changes.
     gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
 
@@ -60,10 +61,8 @@ gapi.client.init({
     updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
     authorizeButton.onclick = handleAuthClick;
     signoutButton.onclick = handleSignoutClick;
-});
+ });
 }
-
-
 
 
 // curl: 'https://api.api.ai/api/query?v=20150910&query=Remind%20me%20to%20eat&lang=en&sessionId=7bb85bf1-182a-4cb1-af4f-d0eb0bff7aa4&timezone=2017-07-17T17:46:37-0700' -H 'Authorization:Bearer 6b8e724b1c5844e3afbf4232cb1686cc'
@@ -77,23 +76,52 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 });
 
 // you need to wait for the client to fully connect before you can send messages
-// rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
-//     rtm.sendMessage("Beep.", channel);
-// });
+rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
+    // rtm.sendMessage("Beep.", channel);
+  var today = new Date().toISOString().substring(0, 10); // change today's date to 'yyyy-mm-dd' format
+  var tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10); // change tomorrow's date to 'yyyy-mm-dd' format
+  Reminder.find({date: {$in: [today, tomorrow]}}, function(err, reminders) { // find all reminders due today or tomorrow
+    console.log('here');
+    if (err) {
+      console.log(err);
+    }
+    else {
+      console.log('ALL REMINDERS:', reminders);
+      reminders.forEach((reminder) => {
+        console.log('rtm.getDMByUserId:', rtm.dataStore.getDMByUserId(reminder.userId));
+        var dm = rtm.dataStore.getDMByUserId(reminder.userId); // dm object by userId
+        var channel = rtm.dataStore.getDMByUserId(reminder.userId).id; // dm channel by userId
+        var date = (reminder.date === today? "today" : "tomorrow") // converts date to string 'today' or 'tomorrow'
+        rtm.sendMessage('Reminder: You need to ' + reminder.subject + ' ' + date, channel) // send message to DM
+      })
+    }
+  })
+});
 
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
-    var dm = rtm.dataStore.getDMByUserId(message.user);
-    if (!dm || dm.id !== message.channel) {
-        return;
+  var dm = rtm.dataStore.getDMByUserId(message.user);
+  if (!dm || dm.id !== message.channel) {
+    return;
+ }
+  User.findOne({slackId: message.user}, function(err, user) {
+    if (err) {
+      res.send({failure: true, error: err});
     }
-    User.findOne({slackId: message.user}, function(err, user) {
+    else if (!user) {
+      var newUser = new User({
+        slackId: message.user
+      });
+      newUser.save(function(err, user){
         if (err) {
             res.send({failure: true, error: err});
         }
         else if (!user) {
+            var userInfo = rtm.dataStore.getUserById(message.user);
             var newUser = new User({
-                slackId: message.user
+                slackId: message.user,
+                slackName: userInfo.name,
+                email: userInfo.profile.email
             });
             newUser.save(function(err, user){
                 if (err) {
@@ -127,7 +155,6 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         }
     })
 });
-
 
 
 rtm.start();
