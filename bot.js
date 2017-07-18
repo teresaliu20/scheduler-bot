@@ -147,7 +147,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
 
                 }
                 else {
-                    rtm.sendMessage('I don\'t understand that. Sorry!', message.channel); 
+                    rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
                 }
             })
         }
