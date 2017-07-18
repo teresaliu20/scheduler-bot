@@ -19,6 +19,7 @@ var oauth2Client = new OAuth2(
 
 var models = require('./models');
 var User = models.User;
+var Reminder = models.Reminder;
 
 // Redirects to Google OAuth2
 app.get('/google/oauth', function(req, res) {

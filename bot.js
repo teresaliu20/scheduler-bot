@@ -18,6 +18,7 @@ var connect = process.env.MONGODB_URI || '';
 mongoose.connect(connect);
 var models = require('./models');
 var User = models.User;
+var Reminder = models.Reminder;
 
 let channel;
 
