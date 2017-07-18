@@ -105,9 +105,9 @@ app.post('/slack/interactive', function(req, res) {
                 });
 
                 // Retrieving the subject of the event in attachment fallback
-                var subject = payload.original_message.indexOf('reminder')
+                var subject = // INSERT SUBJECT HERE
                 // Retrieving the date of the event in attachment pretext
-                var date = payload.original_message
+                var date = // INSERT DATE HERE
                 // Create the event for the Google Calendar API
                 let reminderEvent = {
                     'summary': subject,
