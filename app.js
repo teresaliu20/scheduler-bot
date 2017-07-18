@@ -78,11 +78,9 @@ app.get('/connect/callback', function(req, res) {
 app.post('/slack/interactive', function(req, res) {
     console.log("OAUTH2CLIENT", oauth2Client);
 
-
-
     // Payload contains the interactive message information and event
     var payload = JSON.parse(req.body.payload);
-    console.log('PAYLOAD INTERACTIVE', payload);
+    console.log('PAYLOAD INTERACTIVE', req.body);
 
     // Must retrieve token associated with user stored in database
     User.findOne({slackId: payload.user.id}, function(err, user) {
@@ -105,10 +103,11 @@ app.post('/slack/interactive', function(req, res) {
                     text: 'Created reminder :white_check_mark:',
                     attachments: [attachment]
                 });
+
                 // Retrieving the subject of the event in attachment fallback
-                var subject = payload.original_message.attachments[0].fallback;
+                var subject = payload.original_message.indexOf('reminder')
                 // Retrieving the date of the event in attachment pretext
-                var date = payload.original_message.attachments[0].pretext;
+                var date = payload.original_message
                 // Create the event for the Google Calendar API
                 let reminderEvent = {
                     'summary': subject,

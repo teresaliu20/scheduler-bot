@@ -103,57 +103,58 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   var dm = rtm.dataStore.getDMByUserId(message.user);
   if (!dm || dm.id !== message.channel) {
     return;
- }
+  }
   User.findOne({slackId: message.user}, function(err, user) {
     if (err) {
       res.send({failure: true, error: err});
     }
     else if (!user) {
+      var userInfo = rtm.dataStore.getUserById(message.user);
       var newUser = new User({
-        slackId: message.user
+          slackId: message.user,
+          slackName: userInfo.name,
+          email: userInfo.profile.email
       });
-      newUser.save(function(err, user){
+      newUser.save(function(err, user) {
         if (err) {
-            res.send({failure: true, error: err});
-        }
-        else if (!user) {
-            var userInfo = rtm.dataStore.getUserById(message.user);
-            var newUser = new User({
-                slackId: message.user,
-                slackName: userInfo.name,
-                email: userInfo.profile.email
-            });
-            newUser.save(function(err, user){
-                if (err) {
-                    res.send({failure: true, error: err});
-                }
-                else {
-                    rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
-                }
-            })
+          res.send({failure: true, error: err});
         }
         else {
-            console.log(message);
-            axios.get('https://api.api.ai/api/query', {
-                params: {
-                    v: '20150910',
-                    lang: 'en',
-                    timezone: '2017-07-17T16:55:33-0700',
-                    query: message.text,
-                    sessionId: message.user
-                },
-                headers: {
-                  'Authorization': `Bearer ${process.env.API_AI_TOKEN}`
-                }
-              })
-            .then(({ data }) => {
-              meetOrRemind( data, message );
-            })
-            .catch((err) => {
-              console.log('error:', err);
-            });
+          rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
         }
-    })
+      });
+    }
+    else {
+      console.log(message);
+      axios.get('https://api.api.ai/api/query', {
+          params: {
+            v: '20150910',
+            lang: 'en',
+            timezone: '2017-07-17T16:55:33-0700',
+            query: message.text,
+            sessionId: message.user
+          },
+          headers: {
+            'Authorization': `Bearer ${process.env.API_AI_TOKEN}`
+          }
+        })
+      .then(({ data }) => {
+        meetOrRemind( data, message );
+        var newReminder = new Reminder({
+          subject: data.result.parameters.subject,
+          date: data.result.parameters.date,
+          userId: message.user
+        })
+        return newReminder.save();
+      })
+      .then(resp => {
+        console.log("NEW REMINDER CREATED");
+      })
+      .catch((err) => {
+        console.log('error:', err);
+      });
+    }
+  });
 });
 
 
