@@ -1,14 +1,20 @@
 // Slack RTM set-up
-var RtmClient = require('@slack/client').RtmClient;
-var WebClient = require('@slack/client').WebClient;
+// var RtmClient = require('@slack/client').RtmClient;
+// var WebClient = require('@slack/client').WebClient;
+var bothelp = require('./bothelp');
+
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
+//
+// var bot_token = process.env.SLACK_BOT_TOKEN || '';
+// var token = process.env.SLACK_API_TOKEN || '';
+//
+// var rtm = new RtmClient(bot_token);
+// var web = new WebClient(bot_token);
 
-var bot_token = process.env.SLACK_BOT_TOKEN || '';
-var token = process.env.SLACK_API_TOKEN || '';
-
-var rtm = new RtmClient(bot_token);
-var web = new WebClient(bot_token);
+var meetOrRemind = bothelp.meetOrRemind;
+var rtm = bothelp.rtm;
+var web = bothelp.web;
 
 var axios = require('axios');
 
@@ -19,8 +25,6 @@ mongoose.connect(connect);
 var models = require('./models');
 var User = models.User;
 
-var bothelp = require('./bothelp');
-var meetOrRemind = bothelp.meetOrRemind;
 
 let channel;
 
@@ -115,7 +119,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
                 }
               })
             .then(({ data }) => {
-              meetOrRemind(data, message);
+              meetOrRemind( data, message );
             })
             .catch((err) => {
               console.log('error:', err);
@@ -123,5 +127,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         }
     })
 });
+
+
 
 rtm.start();
