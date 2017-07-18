@@ -19,6 +19,9 @@ mongoose.connect(connect);
 var models = require('./models');
 var User = models.User;
 
+var bothelp = require('./bothelp');
+var meetOrRemind = bothelp.meetOrRemind;
+
 let channel;
 
 // Authorization for Google Calendar
@@ -112,44 +115,11 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
                 }
               })
             .then(({ data }) => {
-                console.log(data);
-                if (data.result.actionIncomplete !== false) {
-                    rtm.sendMessage(data.result.fulfillment.speech, message.channel);
-                }
-                else if (data.result.action === 'reminder:add') {
-                    console.log('ACTION IS COMPLETE', data.result);
-                    web.chat.postMessage(message.channel, 'Creating reminder for ' + data.result.parameters.subject + ' on ' + data.result.parameters.date, {
-                        "text": "Would you like to play a game?",
-                        "attachments": [
-                           {
-                               "text": "Choose an action",
-                               "fallback": "You are unable to choose an action",
-                               "callback_id": "action",
-                               "color": "#3AA3E3",
-                               "attachment_type": "default",
-                               "actions": [
-                                   {
-                                       "name": "action",
-                                       "text": "Confirm",
-                                       "type": "button",
-                                       "value": "confirm"
-                                   },
-                                   {
-                                       "name": "action",
-                                       "text": "Cancel",
-                                       "type": "button",
-                                       "value": "cancel"
-                                   }
-                               ]
-                           }
-                       ]
-                    })
-
-                }
-                else {
-                    rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
-                }
+              meetOrRemind(data, message);
             })
+            .catch((err) => {
+              console.log('error:', err);
+            });
         }
     })
 });
