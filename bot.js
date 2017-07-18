@@ -34,7 +34,7 @@ var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/
 var SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 
 function handleClientLoad() {
-    gapi.load('client:auth2', initClient);
+  gapi.load('client:auth2', initClient);
 }
 
 /**
@@ -42,11 +42,11 @@ function handleClientLoad() {
 *  listeners.
 */
 function initClient() {
-gapi.client.init({
-    discoveryDocs: DISCOVERY_DOCS,
-    clientId: GOOGLE_CLIENT_ID,
-    scope: SCOPES
-}).then(function () {
+    gapi.client.init({
+      discoveryDocs: DISCOVERY_DOCS,
+      clientId: GOOGLE_CLIENT_ID,
+      scope: SCOPES
+  }).then(function () {
     // Listen for sign-in state changes.
     gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
 
@@ -54,7 +54,7 @@ gapi.client.init({
     updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
     authorizeButton.onclick = handleAuthClick;
     signoutButton.onclick = handleSignoutClick;
-});
+ });
 }
 
 
@@ -93,11 +93,19 @@ rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
 
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
-    var dm = rtm.dataStore.getDMByUserId(message.user);
-    if (!dm || dm.id !== message.channel) {
-        return;
+  var dm = rtm.dataStore.getDMByUserId(message.user);
+  if (!dm || dm.id !== message.channel) {
+    return;
+ }
+  User.findOne({slackId: message.user}, function(err, user) {
+    if (err) {
+      res.send({failure: true, error: err});
     }
-    User.findOne({slackId: message.user}, function(err, user) {
+    else if (!user) {
+      var newUser = new User({
+        slackId: message.user
+      });
+      newUser.save(function(err, user){
         if (err) {
             res.send({failure: true, error: err});
         }
@@ -118,60 +126,61 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             })
         }
         else {
-            console.log(message);
-            axios.get('https://api.api.ai/api/query', {
-                params: {
-                    v: '20150910',
-                    lang: 'en',
-                    timezone: '2017-07-17T16:55:33-0700',
-                    query: message.text,
-                    sessionId: message.user
-                },
-                headers: {
-                  'Authorization': `Bearer ${process.env.API_AI_TOKEN}`
-                }
-              })
-            .then(({ data }) => {
-                console.log(data);
-                if (data.result.actionIncomplete !== false) {
-                    rtm.sendMessage(data.result.fulfillment.speech, message.channel);
-                }
-                else if (data.result.action === 'reminder:add') {
-                    console.log('ACTION IS COMPLETE', data.result);
-                    web.chat.postMessage(message.channel, 'Creating reminder for ' + data.result.parameters.subject + ' on ' + data.result.parameters.date, {
-                        "text": "Would you like to play a game?",
-                        "attachments": [
-                           {
-                               "text": "Choose an action",
-                               "fallback": "You are unable to choose an action",
-                               "callback_id": "action",
-                               "color": "#3AA3E3",
-                               "attachment_type": "default",
-                               "actions": [
-                                   {
-                                       "name": "action",
-                                       "text": "Confirm",
-                                       "type": "button",
-                                       "value": "confirm"
-                                   },
-                                   {
-                                       "name": "action",
-                                       "text": "Cancel",
-                                       "type": "button",
-                                       "value": "cancel"
-                                   }
-                               ]
-                           }
-                       ]
-                    })
-
-                }
-                else {
-                    rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
-                }
-            })
+          rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
         }
-    })
+      })
+    }
+    else {
+      console.log(message);
+      axios.get('https://api.api.ai/api/query', {
+        params: {
+          v: '20150910',
+          lang: 'en',
+          timezone: '2017-07-17T16:55:33-0700',
+          query: message.text,
+          sessionId: message.user
+       },
+       headers: {
+         'Authorization': `Bearer ${process.env.API_AI_TOKEN}`
+        }
+      })
+      .then(({ data }) => {
+        console.log(data);
+        if (data.result.actionIncomplete !== false) {
+          rtm.sendMessage(data.result.fulfillment.speech, message.channel);
+        }
+        else if (data.result.action === 'reminder:add') {
+          console.log('ACTION IS COMPLETE', data.result);
+          web.chat.postMessage(message.channel,'Creating reminder for ' + data.result.parameters.subject + ' on ' + data.result.parameters.date, {
+            "attachments": [
+              {
+                "fallback": data.result.parameters.subject,
+                "pretext" : data.result.parameters.date,
+                "callback_id": "action",
+                "color": "#3AA3E3",
+                "attachment_type": "default",
+                "actions": [
+              {
+                "name": "action",
+                "text": "Confirm",
+                "type": "button",
+                "value": "confirm"
+              },
+              {
+                "name": "action",
+                "text": "Cancel",
+                "type": "button",
+                "value": "cancel"
+              }]
+            }]
+           })
+         }
+         else {
+            rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
+         }
+      });
+    }
+  });
 });
 
 rtm.start();
