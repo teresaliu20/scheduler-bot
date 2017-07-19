@@ -12,7 +12,8 @@ var userSchema = mongoose.Schema({
     },
     slackId: String,
     slackName: String,
-    email: String
+    email: String,
+    pendingState: String
 });
 
 var reminderSchema = mongoose.Schema({

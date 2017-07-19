@@ -1,14 +1,20 @@
 // Slack RTM set-up
-var RtmClient = require('@slack/client').RtmClient;
-var WebClient = require('@slack/client').WebClient;
+// var RtmClient = require('@slack/client').RtmClient;
+// var WebClient = require('@slack/client').WebClient;
+var bothelp = require('./bothelp');
+
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
+//
+// var bot_token = process.env.SLACK_BOT_TOKEN || '';
+// var token = process.env.SLACK_API_TOKEN || '';
+//
+// var rtm = new RtmClient(bot_token);
+// var web = new WebClient(bot_token);
 
-var bot_token = process.env.SLACK_BOT_TOKEN || '';
-var token = process.env.SLACK_API_TOKEN || '';
-
-var rtm = new RtmClient(bot_token);
-var web = new WebClient(bot_token);
+var meetOrRemind = bothelp.meetOrRemind;
+var rtm = bothelp.rtm;
+var web = bothelp.web;
 
 var axios = require('axios');
 
@@ -19,6 +25,7 @@ mongoose.connect(connect);
 var models = require('./models');
 var User = models.User;
 var Reminder = models.Reminder;
+
 
 let channel;
 
@@ -69,118 +76,71 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 });
 
 // you need to wait for the client to fully connect before you can send messages
-rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
-    // rtm.sendMessage("Beep.", channel);
-  var today = new Date().toISOString().substring(0, 10); // change today's date to 'yyyy-mm-dd' format
-  var tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10); // change tomorrow's date to 'yyyy-mm-dd' format
-  Reminder.find({date: {$in: [today, tomorrow]}}, function(err, reminders) { // find all reminders due today or tomorrow
-    console.log('here');
-    if (err) {
-      console.log(err);
-    }
-    else {
-      console.log('ALL REMINDERS:', reminders);
-      reminders.forEach((reminder) => {
-        console.log('rtm.getDMByUserId:', rtm.dataStore.getDMByUserId(reminder.userId));
-        var dm = rtm.dataStore.getDMByUserId(reminder.userId); // dm object by userId
-        var channel = rtm.dataStore.getDMByUserId(reminder.userId).id; // dm channel by userId
-        var date = (reminder.date === today? "today" : "tomorrow") // converts date to string 'today' or 'tomorrow'
-        rtm.sendMessage('Reminder: You need to ' + reminder.subject + ' ' + date, channel) // send message to DM
-      })
-    }
-  })
-});
-
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   var dm = rtm.dataStore.getDMByUserId(message.user);
   if (!dm || dm.id !== message.channel) {
     return;
- }
+  }
   User.findOne({slackId: message.user}, function(err, user) {
     if (err) {
       res.send({failure: true, error: err});
     }
     else if (!user) {
+      var userInfo = rtm.dataStore.getUserById(message.user);
       var newUser = new User({
-        slackId: message.user
+          slackId: message.user,
+          slackName: userInfo.name,
+          email: userInfo.profile.email
       });
-      newUser.save(function(err, user){
+      newUser.save(function(err, user) {
         if (err) {
-            res.send({failure: true, error: err});
-        }
-        else if (!user) {
-            var userInfo = rtm.dataStore.getUserById(message.user);
-            var newUser = new User({
-                slackId: message.user,
-                slackName: userInfo.name,
-                email: userInfo.profile.email
-            });
-            newUser.save(function(err, user){
-                if (err) {
-                    res.send({failure: true, error: err});
-                }
-                else {
-                    rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
-                }
-            })
+          res.send({failure: true, error: err});
         }
         else {
           rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
         }
-      })
+      });
     }
     else {
       console.log(message);
       axios.get('https://api.api.ai/api/query', {
-        params: {
-          v: '20150910',
-          lang: 'en',
-          timezone: '2017-07-17T16:55:33-0700',
-          query: message.text,
-          sessionId: message.user
-       },
-       headers: {
-         'Authorization': `Bearer ${process.env.API_AI_TOKEN}`
-        }
-      })
+          params: {
+            v: '20150910',
+            lang: 'en',
+            timezone: '2017-07-17T16:55:33-0700',
+            query: message.text,
+            sessionId: message.user
+          },
+          headers: {
+            'Authorization': `Bearer ${process.env.API_AI_TOKEN}`
+          }
+        })
       .then(({ data }) => {
-        console.log(data);
-        if (data.result.actionIncomplete !== false) {
-          rtm.sendMessage(data.result.fulfillment.speech, message.channel);
-        }
-        else if (data.result.action === 'reminder:add') {
-          console.log('ACTION IS COMPLETE', data.result);
-          web.chat.postMessage(message.channel,'Creating reminder for ' + data.result.parameters.subject + ' on ' + data.result.parameters.date, {
-            "attachments": [
-              {
-                "fallback": data.result.parameters.subject,
-                "pretext" : data.result.parameters.date,
-                "callback_id": "action",
-                "color": "#3AA3E3",
-                "attachment_type": "default",
-                "actions": [
-              {
-                "name": "action",
-                "text": "Confirm",
-                "type": "button",
-                "value": "confirm"
-              },
-              {
-                "name": "action",
-                "text": "Cancel",
-                "type": "button",
-                "value": "cancel"
-              }]
-            }]
-           })
-         }
-         else {
-            rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
-         }
+        User.findOne({slackId: message.user}, function(err, user){
+          var id = user._id;
+          console.log(user.pendingState);
+          if (err){
+            console.log('Database error');
+          } else {
+            if (user.pendingState){
+              var state = JSON.parse(user.pendingState);
+              if (state.subject){
+                rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
+                return;
+              }
+            }
+            meetOrRemind( data, message, user );
+            return;
+          }
+        })
+      })
+      .catch((err) => {
+        console.log('error:', err);
       });
     }
   });
 });
+
 
 rtm.start();
