@@ -110,14 +110,14 @@ app.post('/slack/interactive', function(req, res) {
                 var date = pendingState.date;
                 // Create the event for the Google Calendar API
                 let reminderEvent = {
-                    'summary': 'test summary', // test data
-                    'location': '221 7th St, San Francisco', // test data
-                    'description': 'text Teresa',// test data
+                    'summary': subject,
+                    'location': '',
+                    'description': '',
                     'start': {
-                        'date': '2017-07-18'// test data
+                        'date': date
                     },
                     'end': {
-                        'date': '2017-07-18'// test data
+                        'date': date
                     }
                 }
                 var newReminder = new Reminder({
