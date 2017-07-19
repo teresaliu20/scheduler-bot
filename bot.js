@@ -40,7 +40,6 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
     }
   }
   console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}, but not yet connected to a channel`);
-
 });
 
 // Wait for the client to fully connect before you can send messages
@@ -77,16 +76,17 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     }
     else {
       // send message text as query to Paul, the Api.Ai schedule bot brain
-      
+
       // Replace the <@SlackId> with the user's real name for Api.Ai
       var pendingStateObj = JSON.parse(user.pendingState);
 
-      if (message.text.indexOf('<@U') > -1) {
+      if (!pendingStateObj.type && message.text.indexOf('<@U') > -1) {
         var toReplace = message.text.substring(message.text.indexOf('<@U'), message.text.indexOf('<@U') + 12);
         let userInfo = rtm.dataStore.getUserById(toReplace.substring(2, 11));
         message.text = message.text.replace(toReplace, userInfo.profile.real_name);
 
         pendingStateObj.invitees.push(toReplace.substring(2, 11));
+        console.log('pendingStateObj', pendingStateObj);
         var newInvitees = pendingStateObj.invitees;
         user.pendingState = JSON.stringify({
           invitees: newInvitees
@@ -98,7 +98,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
           else {
             console.log("NEW INVITEES SAVED")
           }
-        }) 
+        })
       }
 
       axios.get('https://api.api.ai/api/query', {
@@ -121,7 +121,8 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             console.log('Database error', err);
           } else {
             // check if the user has not confirmed or cancelled a previous action
-            if (user.pendingState !== "{}"){ // if pending state has not been cleared
+            console.log('JSON', JSON.parse(user.pendingState).invitees);
+            if (JSON.parse(user.pendingState).type) { // if pending state has not been cleared
               rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
               return;
             }
