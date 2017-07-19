@@ -180,7 +180,6 @@ app.post('/slack/interactive', function(req, res) {
             }
         }
     })
->>>>>>> f3dd7047e6d3f26f8e9cac64fbfc2e88f837b36c
 });
 
 app.listen(3000, function() {
