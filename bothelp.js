@@ -18,7 +18,7 @@ var reminderResponse = function(parameters) {
 
 var meetingResponse = function(parameters) {
   var dateStr = (new Date(parameters.date)).toDateString();
-  var words = 'Schedule a meeting with ' + parameters.invitees + ' about ' + parameters.subject + ' on ' + parameters.date + ' at ' + parameters.time;
+  var words = 'Schedule a meeting with ' + parameters.invitees + ' on ' + parameters.date + ' at ' + parameters.time;
   return words;
 }
 
@@ -49,26 +49,27 @@ var messageObject = {
   ]
 }
 
-var distinguish = function(data, message) {
-  if (data.result.action === 'reminder:add'){
-    messageObject.attachments[0].text="reminder";
-    web.chat.postMessage(message.channel, reminderResponse(data.result.parameters), messageObject);
-  } else if (data.result.action === 'meeting:add'){
-    messageObject.attachments[0].text="meeting";
-    web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
-  } else {
-    console.log('Action: ', data.result.action);
-  }
-}
+// var distinguish = function(data, message) {
+//   if (data.result.action === 'reminder:add'){
+//     messageObject.attachments[0].text="reminder";
+//     web.chat.postMessage(message.channel, reminderResponse(data.result.parameters), messageObject);
+//   } else if (data.result.action === 'meeting:add'){
+//     messageObject.attachments[0].text="meeting";
+//     web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
+//   } else {
+//     console.log('Action: ', data.result.action);
+//   }
+// }
 
 function meetOrRemind(data, message, user){
-  console.log(data);
+  console.log("DATA: ",data);
   if (data.result.actionIncomplete) {
     rtm.sendMessage(data.result.fulfillment.speech, message.channel);
   }
-  else if (data.result.action === 'reminder:add' || data.result.action === 'meeting:add') {
-    distinguish(data, message);
+  else if (data.result.action === 'reminder:add') {
+    web.chat.postMessage(message.channel, reminderResponse(data.result.parameters), messageObject);
     user.pendingState = JSON.stringify({
+      type: 'reminder',
       date: data.result.parameters.date,
       subject: data.result.parameters.subject
     });
@@ -80,11 +81,30 @@ function meetOrRemind(data, message, user){
       console.log('user found and pending state set! yay.');
       }
     })
-  } else if (!data.result.actionIncomplete){
+  }
+  else if (data.result.action === 'meeting:add') {
+    console.log("MESSAGE MEETING: ", data.result.parameters);
+    web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
+    user.pendingState = JSON.stringify({
+      type: 'meeting',
+      date: data.result.parameters.date,
+      time: data.result.parameters.time,
+      invitees: data.result.parameters.invitees || ''
+    });
+    user.save(function(err, found){
+    console.log(found);
+    if (err){
+      console.log('error finding user with id', user._id);
+      } else {
+      console.log('user found and pending state set! yay.');
+      }
+    })
+  }
+  else if (!data.result.actionIncomplete){
     rtm.sendMessage(data.result.fulfillment.speech, message.channel);
-  } else {
+  }
+  else {
     rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
-
   }
 }
 

@@ -21,6 +21,7 @@ var oauth2Client = new OAuth2(
 var models = require('./models');
 var User = models.User;
 var Reminder = models.Reminder;
+var Meeting = models.Meeting;
 
 // Redirects to Google OAuth2
 app.get('/google/oauth', function(req, res) {
@@ -73,118 +74,236 @@ app.post('/slack/interactive', function(req, res) {
 
     // Payload contains the interactive message information and event
     var payload = JSON.parse(req.body.payload);
-    console.log('PAYLOAD INTERACTIVE', req.body);
+    console.log('PAYLOAD INTERACTIVE', req.body.payload);
 
     // Must retrieve token associated with user stored in database
     User.findOne({slackId: payload.user.id}, function(err, user) {
       let pending;
-
         if (err) {
             console.log("ERROR FINDING USER", err);
         }
         else {
-            console.log("HEREE", payload.original_message);
-            oauth2Client.setCredentials({
-                'access_token': user.google.access_token,
-                'refresh_token': user.google.refresh_token
-            });
             var pendingState = JSON.parse(user.pendingState);
-            console.log(pendingState);
-
-            console.log('hi');
-
-            // If the user clicked confirm, create Google Calendar event
-            console.log("ORIGINAL TEXT: ", payload.original_message.attachments[0].text)
-            if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'reminder') {
+            console.log("PENDING STATE",pendingState);
+            // If user hits cancel, update the message text
+            if (payload.actions[0].value === 'cancel') {
+                console.log("CANCELLED --------------");
+                var attachment = payload.original_message.attachments[0];
+                delete attachment.actions;
+                if (pendingState.type === 'reminder') {
+                    console.log("HERE----------");
+                    attachment.text = 'Cancelled reminder';
+                    attachment.color = '#DD4814';
+                    res.json({
+                        replace_original: true,
+                        text: 'Cancelled reminder :x:',
+                        attachments: [attachment]
+                    });
+                }
+                else if (pendingState.type === 'meeting') {
+                    attachment.text = 'Cancelled meeting';
+                    attachment.color = '#DD4814';
+                    res.json({
+                        replace_original: true,
+                        text: 'Cancelled meeting :x:',
+                        attachments: [attachment]
+                    });
+                }
+            }
+            else if (payload.actions[0].value === 'confirm') {
+                oauth2Client.setCredentials({
+                    'access_token': user.google.access_token,
+                    'refresh_token': user.google.refresh_token
+                });
 
                 var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
                 delete attachment.actions; // delete buttons
-                attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
-                attachment.color = '#53B987' // change the color to green
-                res.json({
-                    replace_original: true, // replace the original interactive message box with a new messagee
-                    text: 'Created reminder :white_check_mark:',
-                    attachments: [attachment]
-                });
 
-                // Retrieving the subject of the event in attachment fallback
-                var subject = pendingState.subject;
-                // Retrieving the date of the event in attachment pretext
-                var date = pendingState.date;
-                // Create the event for the Google Calendar API
-                let reminderEvent = {
-                    'summary': 'EVENT SUMMARY',
-                    'location': '',
-                    'description': '',
-                    'start': {
-                        'date': '2017-06-19'
-                    },
-                    'end': {
-                        'date': '2017-06-19'
+                if (pendingState.type === 'reminder') {
+                    attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
+                    attachment.color = '#53B987' // change the color to green
+                    res.json({
+                        replace_original: true, // replace the original interactive message box with a new messagee
+                        text: 'Created reminder :white_check_mark:',
+                        attachments: [attachment]
+                    });
+                    // Retrieving the subject of the event in attachment fallback
+                    var subject = pendingState.subject;
+                    // Retrieving the date of the event in attachment pretext
+                    var date = pendingState.date;
+                    // Create the event for the Google Calendar API
+                    let reminderEvent = {
+                        'summary': 'EVENT SUMMARY',
+                        'location': '',
+                        'description': '',
+                        'start': {
+                            'date': '2017-06-19'
+                        },
+                        'end': {
+                            'date': '2017-06-19'
+                        }
                     }
+                    var newReminder = new Reminder({
+                      subject: pendingState.subject,
+                      date: pendingState.date,
+                      userId: payload.user.id
+                    })
+                    newReminder.save(function(err, res) {
+                        if (err) {
+                            console.log("ERR", err);
+                        }
+                        else {
+                            calendar.events.insert({
+                                auth: oauth2Client,
+                                'calendarId': 'primary',
+                                'resource': reminderEvent
+                            }, function(err, resp) {
+                                if (err) {
+                                    console.log("ERROR INSERTING INTO GOOGLE CALENDAR: ", err);
+                                }
+                                else {
+                                    console.log("REMINDER INSERTED INTO GOOGLE CALENDAR", resp);
+                                }
+                            })
+                        }
+                    })
                 }
-                var newReminder = new Reminder({
-                  subject: pendingState.subject,
-                  date: pendingState.date,
-                  userId: payload.user.id
-                })
-                newReminder.save();
-
-                // Insert the event into the user's primary calendar
-                calendar.events.insert({
-                    auth: oauth2Client,
-                    'calendarId': 'primary',
-                    'resource': reminderEvent
-                }, function(err, resp) {
-                    if (err) {
-                        console.log("ERROR INSERTING INTO GOOGLE CALENDAR: ", err);
+                else if (pendingState.type === 'meeting') {
+                    attachment.text = 'Meeting set'; // change the text after the the confirm button was clicked
+                    attachment.color = '#53B987' // change the color to green
+                    res.json({
+                        replace_original: true, // replace the original interactive message box with a new messagee
+                        text: 'Created meeting :white_check_mark:',
+                        attachments: [attachment]
+                    });
+                    let meetingEvent = {
+                        'summary': 'Meeting',
+                        'location': '',
+                        'description': '',
+                        'start': {
+                            'dateTime': '2017-07-28T09:00:00-07:00'
+                        },
+                        'end': {
+                            'dateTime': '2017-07-28T09:00:00-09:00'
+                        }
                     }
-                    else {
-                        console.log("REMINDER INSERTED INTO GOOGLE CALENDAR", resp);
-                    }
-                })
-                user.pendingState = JSON.stringify({});
-
-                user.save(function(err, found){
-                  console.log(found);
-                  if (err){
-                    console.log('error finding user with id', user._id);
-                  } else {
-                    console.log('user found and pending state cleared! yay.');
-                  }
-                });
-
-            }
-            else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'reminder') {
-                // If the cancel button is pressed instead, cancel the event
-                var attachment = payload.original_message.attachments[0];
-                delete attachment.actions;
-                attachment.text = 'Cancelled reminder';
-                attachment.color = '#DD4814'
-                res.json({
-                    replace_original: true,
-                    text: 'Cancelled reminder :x:',
-                    attachments: [attachment]
-                });
-                user.pendingState = JSON.stringify({});
-
-                user.save(function(err, found){
-                  console.log(found);
-                  if (err){
-                    console.log('error finding user with id', user._id);
-                  } else {
-                    console.log('user found and pending state cleared! yay.');
-                  }
-                });
+                    console.log("SAVE MEETIN GHERE");
+                    // var newMeeting = new Meeting({
+                    //     date: data.result.parameters.date,
+                    //     time: data.result.parameters.time,
+                    //     invitees: data.result.parameters.invitees || ''
+                    //     userId: payload.user.id
+                    // })
+                    // newMeeting.save(function(err, res) {
+                    //     if (err) {
+                    //         console.log("ERR", err);
+                    //     }
+                    //     else {
+                    //         calendar.events.insert({
+                    //             auth: oauth2Client,
+                    //             'calendarId': 'primary',
+                    //             'resource': meetingEvent
+                    //         }, function(err, resp) {
+                    //             if (err) {
+                    //                 console.log("ERROR INSERTING INTO GOOGLE CALENDAR: ", err);
+                    //             }
+                    //             else {
+                    //                 console.log("REMINDER INSERTED INTO GOOGLE CALENDAR", resp);
+                    //             }
+                    //         })
+                    //     }
+                    // })
+                }
 
             }
-            else if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'meeting') {
 
-            }
-            else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'meeting') {
+            // console.log("HEREE", payload.original_message);
+            // oauth2Client.setCredentials({
+            //     'access_token': user.google.access_token,
+            //     'refresh_token': user.google.refresh_token
+            // });
+            // var pendingState = JSON.parse(user.pendingState);
+            // console.log(pendingState);
 
-            }
+            // console.log('hi');
+
+            // // If the user clicked confirm, create Google Calendar event
+            // console.log("ORIGINAL TEXT: ", payload.original_message.attachments[0].text)
+            // if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'reminder') {
+
+            //     var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
+            //     delete attachment.actions; // delete buttons
+            //     attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
+            //     attachment.color = '#53B987' // change the color to green
+            //     res.json({
+            //         replace_original: true, // replace the original interactive message box with a new messagee
+            //         text: 'Created reminder :white_check_mark:',
+            //         attachments: [attachment]
+            //     });
+
+            //     // Retrieving the subject of the event in attachment fallback
+            //     var subject = pendingState.subject;
+            //     // Retrieving the date of the event in attachment pretext
+            //     var date = pendingState.date;
+            //     // Create the event for the Google Calendar API
+            //     let meetingEvent = {
+            //         'summary': 'EVENT SUMMARY',
+            //         'location': '',
+            //         'description': '',
+            //         'start': {
+            //             'date': '2017-06-19'
+            //         },
+            //         'end': {
+            //             'date': '2017-06-19'
+            //         }
+            //     }
+            //     var newMeeting = new Meeting({
+            //         date: data.result.parameters.date,
+            //         time: data.result.parameters.time,
+            //         invitees: data.result.parameters.invitees || ''
+            //         userId: payload.user.id
+            //     })
+            //     newMeeting.save();
+
+            //     // Insert the event into the user's primary calendar
+                
+            // }
+            // else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'reminder') {
+            //     // If the cancel button is pressed instead, cancel the event
+            //     var attachment = payload.original_message.attachments[0];
+            //     delete attachment.actions;
+            //     attachment.text = 'Cancelled reminder';
+            //     attachment.color = '#DD4814'
+            //     res.json({
+            //         replace_original: true,
+            //         text: 'Cancelled reminder :x:',
+            //         attachments: [attachment]
+            //     });
+            // }
+            // else if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'meeting') {
+
+            // }
+            // else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'meeting') {
+            //     var attachment = payload.original_message.attachments[0];
+            //     delete attachment.actions;
+            //     attachment.text = 'Cancelled meeting';
+            //     attachment.color = '#DD4814'
+            //     res.json({
+            //         replace_original: true,
+            //         text: 'Cancelled meeting :x:',
+            //         attachments: [attachment]
+            //     });
+            // }
         }
+        user.pendingState = JSON.stringify({});
+        user.save(function(err, found){
+            console.log("FOUND",found);
+            if (err){
+                console.log('error finding user with id', user._id);
+            } else {
+                console.log('user found and pending state cleared! yay.');
+            }
+        });
     })
 });
 
