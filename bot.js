@@ -91,7 +91,8 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       var newUser = new User({
           slackId: message.user,
           slackName: userInfo.name,
-          email: userInfo.profile.email
+          email: userInfo.profile.email,
+          pendingState: ''
       });
       newUser.save(function(err, user) {
         if (err) {
