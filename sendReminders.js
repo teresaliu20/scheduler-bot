@@ -15,9 +15,11 @@ mongoose.connect(connect);
 rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
   var today = new Date().toISOString().substring(0, 10); // change today's date to 'yyyy-mm-dd' format
   var tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10); // change tomorrow's date to 'yyyy-mm-dd' format
-  Reminder.find({date: {$in: [today, tomorrow]}}, function(err, reminders) { // find all reminders due today or tomorrow
+  Reminder.find({date: {$in: [today, tomorrow]}})
+  .remove({date: today})
+  .exec(function(err, reminders) { // find all reminders due today or tomorrow
     if (err) {
-      console.log('error finding reminder ',err);
+      console.log('error finding reminder ', err);
     }
     else {
       reminders.forEach((reminder) => {
