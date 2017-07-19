@@ -94,6 +94,7 @@ app.post('/slack/interactive', function(req, res) {
                 'refresh_token': user.google.refresh_token
             });
             // If the user clicked confirm, create Google Calendar event
+            console.log("ORIGINAL TEXT: ", payload.original_message.attachments[0].text)
             if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'reminder') {
                 var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
                 delete attachment.actions; // delete buttons
@@ -131,7 +132,7 @@ app.post('/slack/interactive', function(req, res) {
                         console.log("ERROR INSERTING INTO GOOGLE CALENDAR: ", err);
                     }
                     else {
-                        console.log("REMINDER INSERTED INTO GOOGLE CALENDAR");
+                        console.log("REMINDER INSERTED INTO GOOGLE CALENDAR", resp);
                     }
                 })
             }
