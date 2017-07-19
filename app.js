@@ -10,6 +10,7 @@ app.use(bodyParser.urlencoded({extended: false}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 var google = require('googleapis');
+var calendar = google.calendar('v3');
 var OAuth2 = google.auth.OAuth2;
 var oauth2Client = new OAuth2(
     process.env.GOOGLE_CLIENT_ID,
