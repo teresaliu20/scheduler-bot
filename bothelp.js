@@ -61,24 +61,30 @@ var distinguish = function(data, message) {
   }
 }
 
-function meetOrRemind(data, message){
+function meetOrRemind(data, message, user){
   console.log(data);
   if (data.result.actionIncomplete) {
     rtm.sendMessage(data.result.fulfillment.speech, message.channel);
   }
   else if (data.result.action === 'reminder:add' || data.result.action === 'meeting:add') {
     distinguish(data, message);
+    user.pendingState = JSON.stringify({
+      date: data.result.parameters.date,
+      subject: data.result.parameters.subject
+    });
+    user.save(function(err, found){
+    console.log(found);
+    if (err){
+      console.log('error finding user with id', user._id);
+      } else {
+      console.log('user found and pending state set! yay.');
+      }
+    })
   } else if (!data.result.actionIncomplete){
     rtm.sendMessage(data.result.fulfillment.speech, message.channel);
   } else {
     rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
 
-    // if(data.result.fulfillment.speech){
-    //   rtm.sendMessage(data.result.fulfillment.speech, message.channel);
-    //   // return;
-    // } else {
-    //   rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
-    // }
   }
 }
 

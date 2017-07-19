@@ -10,7 +10,7 @@ app.use(bodyParser.urlencoded({extended: false}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 var google = require('googleapis');
-
+var calendar = google.calendar('v3');
 var OAuth2 = google.auth.OAuth2;
 var oauth2Client = new OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -18,15 +18,12 @@ var oauth2Client = new OAuth2(
     process.env.DOMAIN + '/connect/callback'
 );
 
-var calendar = google.calendar('v3');
-
 var models = require('./models');
 var User = models.User;
 var Reminder = models.Reminder;
 
 // Redirects to Google OAuth2
 app.get('/google/oauth', function(req, res) {
-    // Generate a redirect url when user logs into google
     var url = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
@@ -34,34 +31,29 @@ app.get('/google/oauth', function(req, res) {
             'https://www.googleapis.com/auth/userinfo.profile',
             'https://www.googleapis.com/auth/calendar'
         ],
-        // Encodes the auth_id from the passed in query that saves current user's id
         state: encodeURIComponent(JSON.stringify({
             auth_id: req.query.auth_id
         }))
     })
-    // Redirect to the generated URL
     res.redirect(url);
 });
 
-// Handles callback created from Google OAuth2 when the user logs in
+// Handles callback from Google OAuth2
 app.get('/connect/callback', function(req, res) {
-    // Decodes the auth_id from query, used to find current user from database
     var authId = JSON.parse(decodeURIComponent(req.query.state)).auth_id;
-    // Authorization code generated from the google server using the request token
     var code = req.query.code;
     console.log("AUTH ID : ", authId);
     oauth2Client.getToken(code, function (err, tokens) {
-        // Now tokens contains an access_token and an optional refresh_token that we save
+        // Now tokens contains an access_token and an optional refresh_token. Save them.
         if (!err) {
             oauth2Client.setCredentials(tokens);
             console.log("TOKENS: ",tokens);
-            // Save the tokens to the current user in the database to use later
             User.findByIdAndUpdate(authId, { $set: {google: tokens}}, function(err, user) {
                 if (err) {
                     res.send({success: false, error: err});
                 }
                 else {
-                    console.log('FOUND USER', user);
+                    console.log(user);
                     res.send({success: true});
                 }
             })
@@ -74,6 +66,7 @@ app.get('/connect/callback', function(req, res) {
 
 })
 
+
 // Route to handle interactive message actions
 app.post('/slack/interactive', function(req, res) {
     console.log("OAUTH2CLIENT", oauth2Client);
@@ -84,6 +77,8 @@ app.post('/slack/interactive', function(req, res) {
 
     // Must retrieve token associated with user stored in database
     User.findOne({slackId: payload.user.id}, function(err, user) {
+      let pending;
+
         if (err) {
             console.log("ERROR FINDING USER", err);
         }
@@ -93,9 +88,15 @@ app.post('/slack/interactive', function(req, res) {
                 'access_token': user.google.access_token,
                 'refresh_token': user.google.refresh_token
             });
+            var pendingState = JSON.parse(user.pendingState);
+            console.log(pendingState);
+
+            console.log('hi');
+
             // If the user clicked confirm, create Google Calendar event
             console.log("ORIGINAL TEXT: ", payload.original_message.attachments[0].text)
             if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'reminder') {
+
                 var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
                 delete attachment.actions; // delete buttons
                 attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
@@ -107,9 +108,9 @@ app.post('/slack/interactive', function(req, res) {
                 });
 
                 // Retrieving the subject of the event in attachment fallback
-                // var subject = // INSERT SUBJECT HERE
+                var subject = pendingState.subject;
                 // Retrieving the date of the event in attachment pretext
-                // var date = // INSERT DATE HERE
+                var date = pendingState.date;
                 // Create the event for the Google Calendar API
                 let reminderEvent = {
                     'summary': 'EVENT SUMMARY',
@@ -122,6 +123,13 @@ app.post('/slack/interactive', function(req, res) {
                         'date': '2017-06-19'
                     }
                 }
+                var newReminder = new Reminder({
+                  subject: pendingState.subject,
+                  date: pendingState.date,
+                  userId: payload.user.id
+                })
+                newReminder.save();
+
                 // Insert the event into the user's primary calendar
                 calendar.events.insert({
                     auth: oauth2Client,
@@ -135,6 +143,17 @@ app.post('/slack/interactive', function(req, res) {
                         console.log("REMINDER INSERTED INTO GOOGLE CALENDAR", resp);
                     }
                 })
+                user.pendingState = JSON.stringify({});
+
+                user.save(function(err, found){
+                  console.log(found);
+                  if (err){
+                    console.log('error finding user with id', user._id);
+                  } else {
+                    console.log('user found and pending state cleared! yay.');
+                  }
+                });
+
             }
             else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'reminder') {
                 // If the cancel button is pressed instead, cancel the event
@@ -147,6 +166,17 @@ app.post('/slack/interactive', function(req, res) {
                     text: 'Cancelled reminder :x:',
                     attachments: [attachment]
                 });
+                user.pendingState = JSON.stringify({});
+
+                user.save(function(err, found){
+                  console.log(found);
+                  if (err){
+                    console.log('error finding user with id', user._id);
+                  } else {
+                    console.log('user found and pending state cleared! yay.');
+                  }
+                });
+
             }
             else if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'meeting') {
 
