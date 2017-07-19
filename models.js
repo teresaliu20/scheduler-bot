@@ -34,7 +34,7 @@ var meetingSchema = mongoose.Schema({
     type: String,
     required: true
   },
-  time: {
+  startTime: {
     type: String,
     required: true
   },
@@ -44,6 +44,7 @@ var meetingSchema = mongoose.Schema({
   },
   subject: String,
   location: String,
+  endTime: String,
   meetingLength: Number,
   status: String,
   createdAt: String,
