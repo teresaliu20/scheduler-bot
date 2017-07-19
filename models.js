@@ -30,7 +30,7 @@ var reminderSchema = mongoose.Schema({
 });
 
 var meetingSchema = mongoose.Schema({
-  day: {
+  date: {
     type: String,
     required: true
   },
