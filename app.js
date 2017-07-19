@@ -84,6 +84,8 @@ app.post('/slack/interactive', function(req, res) {
 
     // Must retrieve token associated with user stored in database
     User.findOne({slackId: payload.user.id}, function(err, user) {
+      let pending;
+
         if (err) {
             console.log("ERROR FINDING USER", err);
         }
@@ -92,7 +94,13 @@ app.post('/slack/interactive', function(req, res) {
                 'access_token': user.google.access_token,
                 'refresh_token': user.google.refresh_token
             });
+            var pendingState = JSON.parse(user.pendingState);
+            console.log(pendingState);
+
+            console.log('hi');
+
             // If the user clicked confirm, create Google Calendar event
+            // if user has not clicked confirm or cancel they are still in 'pending' state
             if (payload.actions[0].value === 'confirm') {
                 var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
                 delete attachment.actions; // delete buttons
@@ -105,9 +113,9 @@ app.post('/slack/interactive', function(req, res) {
                 });
 
                 // Retrieving the subject of the event in attachment fallback
-                var subject = // INSERT SUBJECT HERE
+                var subject = pendingState.subject;
                 // Retrieving the date of the event in attachment pretext
-                var date = // INSERT DATE HERE
+                var date = pendingState.date;
                 // Create the event for the Google Calendar API
                 let reminderEvent = {
                     'summary': subject,
@@ -120,6 +128,13 @@ app.post('/slack/interactive', function(req, res) {
                         'date': date
                     }
                 }
+                var newReminder = new Reminder({
+                  subject: pendingState.subject,
+                  date: pendingState.date,
+                  userId: payload.user.id
+                })
+                newReminder.save();
+
                 // Insert the event into the user's primary calendar
                 calendar.events.insert({
                     auth: oauth2Client,
@@ -133,6 +148,17 @@ app.post('/slack/interactive', function(req, res) {
                         console.log("REMINDER INSERTED INTO GOOGLE CALENDAR");
                     }
                 })
+                user.pendingState = JSON.stringify({});
+
+                user.save(function(err, found){
+                  console.log(found);
+                  if (err){
+                    console.log('error finding user with id', user._id);
+                  } else {
+                    console.log('user found and pending state cleared! yay.');
+                  }
+                });
+
             }
             else {
                 // If the cancel button is pressed instead, cancel the event
@@ -148,6 +174,17 @@ app.post('/slack/interactive', function(req, res) {
                     text: 'Cancelled reminder :x:',
                     attachments: [attachment]
                 });
+                user.pendingState = JSON.stringify({});
+
+                user.save(function(err, found){
+                  console.log(found);
+                  if (err){
+                    console.log('error finding user with id', user._id);
+                  } else {
+                    console.log('user found and pending state cleared! yay.');
+                  }
+                });
+
             }
         }
     })
