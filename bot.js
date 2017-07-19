@@ -139,16 +139,23 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
           }
         })
       .then(({ data }) => {
-        meetOrRemind( data, message );
-        var newReminder = new Reminder({
-          subject: data.result.parameters.subject,
-          date: data.result.parameters.date,
-          userId: message.user
+        User.findOne({slackId: message.user}, function(err, user){
+          var id = user._id;
+          console.log(user.pendingState);
+          if (err){
+            console.log('Database error');
+          } else {
+            if (user.pendingState){
+              var state = JSON.parse(user.pendingState);
+              if (state.subject){
+                rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
+                return;
+              }
+            }
+            meetOrRemind( data, message, user );
+            return;
+          }
         })
-        return newReminder.save();
-      })
-      .then(resp => {
-        console.log("NEW REMINDER CREATED");
       })
       .catch((err) => {
         console.log('error:', err);
