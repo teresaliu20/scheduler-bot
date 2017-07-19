@@ -26,7 +26,7 @@ rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
         var dm = rtm.dataStore.getDMByUserId(reminder.userId); // dm object by userId
         var channel = dm.id; // dm channel by userId
         var date = (reminder.date === today? "today" : "tomorrow") // converts date to string 'today' or 'tomorrow'
-        rtm.sendMessage('BEEP Reminder: You need to ' + reminder.subject + ' ' + date, channel) // send message to DM
+        rtm.sendMessage('Reminder: You need to ' + reminder.subject + ' ' + date, channel) // send message to DM
       })
       rtm.disconnect();
       mongoose.connection.close();
