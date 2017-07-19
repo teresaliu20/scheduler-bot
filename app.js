@@ -43,18 +43,15 @@ app.get('/google/oauth', function(req, res) {
 app.get('/connect/callback', function(req, res) {
     var authId = JSON.parse(decodeURIComponent(req.query.state)).auth_id;
     var code = req.query.code;
-    console.log("AUTH ID : ", authId);
     oauth2Client.getToken(code, function (err, tokens) {
         // Now tokens contains an access_token and an optional refresh_token. Save them.
         if (!err) {
             oauth2Client.setCredentials(tokens);
-            console.log("TOKENS: ",tokens);
             User.findByIdAndUpdate(authId, { $set: {google: tokens}}, function(err, user) {
                 if (err) {
                     res.send({success: false, error: err});
                 }
                 else {
-                    console.log(user);
                     res.send({success: true});
                 }
             })
@@ -70,11 +67,9 @@ app.get('/connect/callback', function(req, res) {
 
 // Route to handle interactive message actions
 app.post('/slack/interactive', function(req, res) {
-    console.log("OAUTH2CLIENT", oauth2Client);
 
     // Payload contains the interactive message information and event
     var payload = JSON.parse(req.body.payload);
-    console.log('PAYLOAD INTERACTIVE', req.body.payload);
 
     // Must retrieve token associated with user stored in database
     User.findOne({slackId: payload.user.id}, function(err, user) {
@@ -84,14 +79,11 @@ app.post('/slack/interactive', function(req, res) {
         }
         else {
             var pendingState = JSON.parse(user.pendingState);
-            console.log("PENDING STATE",pendingState);
             // If user hits cancel, update the message text
             if (payload.actions[0].value === 'cancel') {
-                console.log("CANCELLED --------------");
                 var attachment = payload.original_message.attachments[0];
                 delete attachment.actions;
                 if (pendingState.type === 'reminder') {
-                    console.log("HERE----------");
                     attachment.text = 'Cancelled reminder';
                     attachment.color = '#DD4814';
                     res.json({
@@ -188,31 +180,32 @@ app.post('/slack/interactive', function(req, res) {
                         }
                     }
                     console.log("SAVE MEETIN GHERE");
-                    // var newMeeting = new Meeting({
-                    //     date: data.result.parameters.date,
-                    //     time: data.result.parameters.time,
-                    //     invitees: data.result.parameters.invitees || ''
-                    //     userId: payload.user.id
-                    // })
-                    // newMeeting.save(function(err, res) {
-                    //     if (err) {
-                    //         console.log("ERR", err);
-                    //     }
-                    //     else {
-                    //         calendar.events.insert({
-                    //             auth: oauth2Client,
-                    //             'calendarId': 'primary',
-                    //             'resource': meetingEvent
-                    //         }, function(err, resp) {
-                    //             if (err) {
-                    //                 console.log("ERROR INSERTING INTO GOOGLE CALENDAR: ", err);
-                    //             }
-                    //             else {
-                    //                 console.log("REMINDER INSERTED INTO GOOGLE CALENDAR", resp);
-                    //             }
-                    //         })
-                    //     }
-                    // })
+                    console.log("PENDING STATE", pendingState);
+                    var newMeeting = new Meeting({
+                        date: pendingState.date,
+                        time: pendingState.time[0],
+                        invitees: pendingState || [],
+                        userId: payload.user.id
+                    })
+                    newMeeting.save(function(err, res) {
+                        if (err) {
+                            console.log("ERR", err);
+                        }
+                        else {
+                            calendar.events.insert({
+                                auth: oauth2Client,
+                                'calendarId': 'primary',
+                                'resource': meetingEvent
+                            }, function(err, resp) {
+                                if (err) {
+                                    console.log("ERROR INSERTING MEETING INTO GOOGLE CALENDAR: ", err);
+                                }
+                                else {
+                                    console.log("MEETING INSERTED INTO GOOGLE CALENDAR", resp);
+                                }
+                            })
+                        }
+                    })
                 }
 
             }
@@ -297,7 +290,6 @@ app.post('/slack/interactive', function(req, res) {
         }
         user.pendingState = JSON.stringify({});
         user.save(function(err, found){
-            console.log("FOUND",found);
             if (err){
                 console.log('error finding user with id', user._id);
             } else {
