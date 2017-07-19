@@ -45,6 +45,7 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 
 // Wait for the client to fully connect before you can send messages
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
+  console.log('Message', message);
   var dm = rtm.dataStore.getDMByUserId(message.user);
   if (!dm || dm.id !== message.channel) {
     return;
@@ -120,12 +121,9 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             console.log('Database error', err);
           } else {
             // check if the user has not confirmed or cancelled a previous action
-            if (user.pendingState){
-              var state = JSON.parse(user.pendingState);
-              if (state.subject){
-                rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
-                return;
-              }
+            if (user.pendingState !== "{}"){ // if pending state has not been cleared
+              rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
+              return;
             }
             // At this point, the user has no pending actions,
             // so we allow them to make meetings and reminders using meetOrRemind

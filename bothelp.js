@@ -1,5 +1,6 @@
 var RtmClient = require('@slack/client').RtmClient;
 var WebClient = require('@slack/client').WebClient;
+var moment = require('moment-timezone');
 // var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 // var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
 
@@ -9,16 +10,28 @@ var token = process.env.SLACK_API_TOKEN || '';
 var rtm = new RtmClient(bot_token);
 var web = new WebClient(bot_token);
 
-
 var reminderResponse = function(parameters) {
-  var dateStr = (new Date(parameters.date)).toDateString();
-  var words = 'Creating reminder "' + parameters.subject + '" on ' + dateStr;
+  var dateStr = moment(parameters.date, "America/Los_Angeles").format('dddd, LL'); // format: Wednesday, July 19, 2017
+  var words = 'Creating reminder: ' + parameters.subject + ' on ' + dateStr;
   return words;
 }
 
 var meetingResponse = function(parameters) {
-  var dateStr = (new Date(parameters.date)).toDateString();
-  var words = 'Schedule a meeting on ' + parameters.date + ' at ' + parameters.time;
+  var dateStr = moment(parameters.date, "America/Los_Angeles").format('dddd, LL'); // format: Wednesday, July 19, 2017
+console.log('timeStr', parameters.time[0]);
+  var timeStr = parameters.time[0].substring(0, 5) + (parseInt(parameters.time[0].substring(0, 2)) > 11? ' PM' : ' AM') // format: 1:49 PM
+  var invitees = '';
+  for (var i = 0; i < parameters.invitees.length; i++) { // add all invitees to invitees
+    // if not yet reached the end of the invitee list or there is only one invitee, then add invitee name to title
+    if (i !== parameters.invitees.length - 1 || i === parameters.invitees.length - 1 && i === 0) {
+      invitees += parameters.invitees[i]
+    }
+    // else if at the last name in invitee list, and an 'and' before the end
+    else {
+      invitees = invitees + ' and ' + parameters.invitees[i]
+    }
+  }
+  var words = 'Schedule a meeting with ' + invitees + ' on ' + dateStr + ' at ' + timeStr;
   return words;
 }
 
