@@ -76,28 +76,6 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 });
 
 // you need to wait for the client to fully connect before you can send messages
-rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
-    // rtm.sendMessage("Beep.", channel);
-  var today = new Date().toISOString().substring(0, 10); // change today's date to 'yyyy-mm-dd' format
-  var tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().substring(0, 10); // change tomorrow's date to 'yyyy-mm-dd' format
-  Reminder.find({date: {$in: [today, tomorrow]}}, function(err, reminders) { // find all reminders due today or tomorrow
-    console.log('here');
-    if (err) {
-      console.log(err);
-    }
-    else {
-      console.log('ALL REMINDERS:', reminders);
-      reminders.forEach((reminder) => {
-        console.log('rtm.getDMByUserId:', rtm.dataStore.getDMByUserId(reminder.userId));
-        var dm = rtm.dataStore.getDMByUserId(reminder.userId); // dm object by userId
-        var channel = rtm.dataStore.getDMByUserId(reminder.userId).id; // dm channel by userId
-        var date = (reminder.date === today? "today" : "tomorrow") // converts date to string 'today' or 'tomorrow'
-        rtm.sendMessage('Reminder: You need to ' + reminder.subject + ' ' + date, channel) // send message to DM
-      })
-    }
-  })
-});
-
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   var dm = rtm.dataStore.getDMByUserId(message.user);
@@ -138,16 +116,23 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
           }
         })
       .then(({ data }) => {
-        meetOrRemind( data, message );
-        var newReminder = new Reminder({
-          subject: data.result.parameters.subject,
-          date: data.result.parameters.date,
-          userId: message.user
+        User.findOne({slackId: message.user}, function(err, user){
+          var id = user._id;
+          console.log(user.pendingState);
+          if (err){
+            console.log('Database error');
+          } else {
+            if (user.pendingState){
+              var state = JSON.parse(user.pendingState);
+              if (state.subject){
+                rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
+                return;
+              }
+            }
+            meetOrRemind( data, message, user );
+            return;
+          }
         })
-        return newReminder.save();
-      })
-      .then(resp => {
-        console.log("NEW REMINDER CREATED");
       })
       .catch((err) => {
         console.log('error:', err);
