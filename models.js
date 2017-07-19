@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+// create a user schema to store login info accessed by Google OAuth and Slack
 var userSchema = mongoose.Schema({
     google: {
       profile_id: String,
@@ -17,6 +18,8 @@ var userSchema = mongoose.Schema({
     pendingState: String
 });
 
+// create a reminder schema to store reminders for each user
+// these will be accessed later using the user's slackId (userId)
 var reminderSchema = mongoose.Schema({
   subject: {
     type: String,
@@ -29,6 +32,8 @@ var reminderSchema = mongoose.Schema({
   userId: String
 });
 
+// create a meeting schema to store meetings for each user
+// these can be accessed later using their slackId (userId)
 var meetingSchema = mongoose.Schema({
   date: {
     type: String,

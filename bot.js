@@ -1,20 +1,11 @@
-// Slack RTM set-up
-// var RtmClient = require('@slack/client').RtmClient;
-// var WebClient = require('@slack/client').WebClient;
+// Import slack RTM and Web API dependencies
 var bothelp = require('./bothelp');
+var rtm = bothelp.rtm;
+var web = bothelp.web;
+var meetOrRemind = bothelp.meetOrRemind;
 
 var CLIENT_EVENTS = require('@slack/client').CLIENT_EVENTS;
 var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
-//
-// var bot_token = process.env.SLACK_BOT_TOKEN || '';
-// var token = process.env.SLACK_API_TOKEN || '';
-//
-// var rtm = new RtmClient(bot_token);
-// var web = new WebClient(bot_token);
-
-var meetOrRemind = bothelp.meetOrRemind;
-var rtm = bothelp.rtm;
-var web = bothelp.web;
 
 var axios = require('axios');
 
@@ -25,7 +16,6 @@ mongoose.connect(connect);
 var models = require('./models');
 var User = models.User;
 var Reminder = models.Reminder;
-
 
 let channel;
 
@@ -40,43 +30,19 @@ var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/
 // included, separated by spaces.
 var SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 
-function handleClientLoad() {
-  gapi.load('client:auth2', initClient);
-}
-
-/**
-*  Initializes the API client library and sets up sign-in state
-*  listeners.
-*/
-function initClient() {
-    gapi.client.init({
-      discoveryDocs: DISCOVERY_DOCS,
-      clientId: GOOGLE_CLIENT_ID,
-      scope: SCOPES
-  }).then(function () {
-    // Listen for sign-in state changes.
-    gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
-
-    // Handle the initial sign-in state.
-    updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
-    authorizeButton.onclick = handleAuthClick;
-    signoutButton.onclick = handleSignoutClick;
- });
-}
-
-
 // curl: 'https://api.api.ai/api/query?v=20150910&query=Remind%20me%20to%20eat&lang=en&sessionId=7bb85bf1-182a-4cb1-af4f-d0eb0bff7aa4&timezone=2017-07-17T17:46:37-0700' -H 'Authorization:Bearer 6b8e724b1c5844e3afbf4232cb1686cc'
 
 // The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
 rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
   for (const c of rtmStartData.channels) {
-    if (c.is_member && c.name ==='general') { channel = c.id }
+    if (c.is_member && c.name ==='general') {
+      channel = c.id;
+    }
   }
   console.log(`Logged in as ${rtmStartData.self.name} of team ${rtmStartData.team.name}, but not yet connected to a channel`);
 });
 
-// you need to wait for the client to fully connect before you can send messages
-
+// Wait for the client to fully connect before you can send messages
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
   var dm = rtm.dataStore.getDMByUserId(message.user);
   if (!dm || dm.id !== message.channel) {
@@ -88,6 +54,8 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     }
     else if (!user) {
       var userInfo = rtm.dataStore.getUserById(message.user);
+
+      //store the user's information in the database if not already stored
       var newUser = new User({
           slackId: message.user,
           slackName: userInfo.name,
@@ -104,6 +72,7 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       });
     }
     else {
+      // send message text as query to Paul, the Api.Ai schedule bot brain
       axios.get('https://api.api.ai/api/query', {
           params: {
             v: '20150910',
@@ -119,10 +88,10 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       .then(({ data }) => {
         User.findOne({slackId: message.user}, function(err, user){
           var id = user._id;
-          console.log(user.pendingState);
           if (err){
-            console.log('Database error');
+            console.log('Database error', err);
           } else {
+            // check if the user has not confirmed or cancelled a previous action
             if (user.pendingState){
               var state = JSON.parse(user.pendingState);
               if (state.subject){
@@ -130,6 +99,8 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
                 return;
               }
             }
+            // At this point, the user has no pending actions,
+            // so we allow them to make meetings and reminders using meetOrRemind
             meetOrRemind( data, message, user );
             return;
           }
