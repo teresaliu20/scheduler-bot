@@ -62,21 +62,11 @@ var messageObject = {
   ]
 }
 
-// var distinguish = function(data, message) {
-//   if (data.result.action === 'reminder:add'){
-//     messageObject.attachments[0].text="reminder";
-//     web.chat.postMessage(message.channel, reminderResponse(data.result.parameters), messageObject);
-//   } else if (data.result.action === 'meeting:add'){
-//     messageObject.attachments[0].text="meeting";
-//     web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
-//   } else {
-//     console.log('Action: ', data.result.action);
-//   }
-// }
-
 function meetOrRemind(data, message, user){
-  console.log("DATA: ",data);
-  if (data.result.actionIncomplete) {
+  if (JSON.parse(user.pendingState).invitees.length === 0 && data.result.action === "meeting:add") {
+    rtm.sendMessage("With whom do you want to meet?", message.channel);
+  }
+  else if (data.result.actionIncomplete) {
     rtm.sendMessage(data.result.fulfillment.speech, message.channel);
   }
   else if (data.result.action === 'reminder:add') {
@@ -87,37 +77,34 @@ function meetOrRemind(data, message, user){
       subject: data.result.parameters.subject
     });
     user.save(function(err, found){
-    console.log(found);
     if (err){
       console.log('error finding user with id', user._id);
       } else {
-      console.log('user found and pending state set! yay.');
+      console.log('1. user found and pending state set! yay.');
       }
     })
   }
   else if (data.result.action === 'meeting:add') {
-    console.log("MESSAGE MEETING: ", data.result.parameters);
     web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
+
+    var slackIdsInvitees = JSON.parse(user.pendingState);
+
     user.pendingState = JSON.stringify({
       type: 'meeting',
       date: data.result.parameters.date,
       startTime: data.result.parameters.time[0], // startTime in time array
       endTime: data.result.parameters.time[1] || '', // endTime in time array
-      invitees: data.result.parameters.invitees || '',
+      invitees: slackIdsInvitees.invitees,
       description: data.result.parameters.subject || '',
       location: data.result.parameters.location || ''
     });
     user.save(function(err, found){
-    console.log(found);
     if (err){
       console.log('error finding user with id', user._id);
       } else {
-      console.log('user found and pending state set! yay.');
+      console.log('2. user found and pending state set! yay.');
       }
     })
-  }
-  else if (!data.result.actionIncomplete){
-    rtm.sendMessage(data.result.fulfillment.speech, message.channel);
   }
   else {
     rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);

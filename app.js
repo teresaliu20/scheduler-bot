@@ -24,6 +24,9 @@ var User = models.User;
 var Reminder = models.Reminder;
 var Meeting = models.Meeting;
 
+var bothelp = require('./bothelp');
+var rtm = bothelp.rtm;
+
 // Redirects to Google OAuth2
 // User must allow slackBot to access their google calendar
 app.get('/google/oauth', function(req, res) {
@@ -197,18 +200,19 @@ app.post('/slack/interactive', function(req, res) {
 
                   // Format proper title/summary for each event based on the invitee list
                   // If the invitee list is empty, then title is just 'Meeting'
-                  var title = 'Meeting';
+                  var title = 'Meeting: ' + rtm.dataStore.getUserById(user.slackId).profile.real_name;
                   //otherwise, title becomes 'Meeting with ...'
                   if (pendingState.invitees !== []) {
-                    title += ' with '
                     for (var i = 0; i < pendingState.invitees.length; i++) { // add all invitees to title
                       // if not yet reached the end of the invitee list or there is only one invitee, then add invitee name to title
-                      if (i !== pendingState.invitees.length - 1 || i === pendingState.invitees.length - 1 && i === 0) {
-                        title += pendingState.invitees[i]
+                      if (i !== pendingState.invitees.length - 1) {
+                        let userInfo = rtm.dataStore.getUserById(pendingState.invitees[i]);
+                        title += ", " + userInfo.profile.real_name;
                       }
                       // else if at the last name in invitee list, and an 'and' before the end
                       else {
-                        title = title + ' and ' + pendingState.invitees[i]
+                        let userInfo = rtm.dataStore.getUserById(pendingState.invitees[i]);
+                        title = title + ' and ' + userInfo.profile.real_name;
                       }
                     }
                   }
@@ -222,6 +226,16 @@ app.post('/slack/interactive', function(req, res) {
                         text: 'Created a ' + title + ' at ' + timeStr + ':white_check_mark:',
                         attachments: [attachment]
                     });
+
+                    // Generate array of attendees
+                    var attendees = [];
+                    for (var i = 0; i < pendingState.invitees.length; i++) {
+                        let user = rtm.dataStore.getUserById(pendingState.invitees[i]);
+                        attendees.push({
+                            'email' : user.profile.email
+                        });
+                    }
+    
                     let meetingEvent = {
                         'summary': title,
                         'location': pendingState.location,
@@ -231,14 +245,15 @@ app.post('/slack/interactive', function(req, res) {
                         },
                         'end': {
                             'dateTime': endTime
-                        }
+                        },
+                        'attendees': attendees
                     }
 
                     // Create and save new meeting to database
                     var newMeeting = new Meeting({
                         date: pendingState.date,
                         startTime: startTime,
-                        invitees: pendingState.invitees || [],
+                        invitees: attendees,
                         userId: payload.user.id,
                         subject: pendingState.description,
                         location: pendingState.location,
@@ -270,12 +285,14 @@ app.post('/slack/interactive', function(req, res) {
             }
         }
         // Reset pending state to an empty string after user has confirmed or cancelled action
-        user.pendingState = JSON.stringify({});
+        user.pendingState = JSON.stringify({
+            invitees: []
+        });
         user.save(function(err, found){
             if (err){
                 console.log('error finding user with id', user._id);
             } else {
-                console.log('user found and pending state cleared! yay.');
+                console.log('3. user found and pending state cleared! yay.');
             }
         });
     })
