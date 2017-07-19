@@ -161,31 +161,58 @@ app.post('/slack/interactive', function(req, res) {
                     })
                 }
                 else if (pendingState.type === 'meeting') {
+                  console.log('PENDING STATE', pendingState);
+                  var startTimeStr = pendingState.date + ' ' + pendingState.startTime; // concatenate date and time to make a date obj later
+                  var startTime = new Date(startTimeStr).toISOString(); // create date object for start time
+                  var endTime = (pendingState.endTime === '' ? // if end time isn't specified
+                    new Date(new Date(startTimeStr).getTime() + 30*60*1000).toISOString() : // make end time 30 minutes later than start time
+                    new Date(pendingState.date + ' ' + pendingState.endTime).toISOString()); // otherwise, make endtime as specified
+
+                  // format proper title/summary for each event based on the invitee list
+                  var title = 'Meeting'; // if the invitee list is empty, then title is just 'Meeting'
+                  if (pendingState.invitees !== []) { // otherwise, title becomes 'Meeting with ...'
+                    title += ' with '
+                    for (var i = 0; i < pendingState.invitees.length; i++) { // add all invitees to title
+                      // if not yet reached the end of the invitee list or there is only one invitee, then add invitee name to title
+                      if (i !== pendingState.invitees.length - 1 || i === pendingState.invitees.length - 1 && i === 0) {
+                        title += pendingState.invitees[i]
+                      }
+                      else { // else if at the last name in invitee list, and an 'and' before the end
+                        title = title + ' and ' + pendingState.invitees[i]
+                      }
+                    }
+                  }
+
                     attachment.text = 'Meeting set'; // change the text after the the confirm button was clicked
                     attachment.color = '#53B987' // change the color to green
                     res.json({
                         replace_original: true, // replace the original interactive message box with a new messagee
-                        text: 'Created meeting :white_check_mark:',
+                        text: 'Created a ' + title + 'at ' + pendingState.startTime + ':white_check_mark:', // display confirmation information
                         attachments: [attachment]
                     });
                     let meetingEvent = {
-                        'summary': 'Meeting',
-                        'location': '',
-                        'description': '',
+                        'summary': title,
+                        'location': pendingState.location,
+                        'description': pendingState.description,
                         'start': {
-                            'dateTime': '2017-07-28T09:00:00-07:00'
+                            'dateTime': startTime
                         },
                         'end': {
-                            'dateTime': '2017-07-28T09:00:00-09:00'
+                            'dateTime': endTime
                         }
                     }
-                    console.log("SAVE MEETIN GHERE");
+                    console.log("SAVE MEETIN HERE");
                     console.log("PENDING STATE", pendingState);
                     var newMeeting = new Meeting({
                         date: pendingState.date,
-                        time: pendingState.time[0],
-                        invitees: pendingState || [],
-                        userId: payload.user.id
+                        startTime: startTime,
+                        invitees: pendingState.invitees || [],
+                        userId: payload.user.id,
+                        subject: pendingState.description,
+                        location: pendingState.location,
+                        endTime: endTime,
+                        status: '',
+                        createdAt: new Date().toISOString()
                     })
                     newMeeting.save(function(err, res) {
                         if (err) {

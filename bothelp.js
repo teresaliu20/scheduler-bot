@@ -88,8 +88,11 @@ function meetOrRemind(data, message, user){
     user.pendingState = JSON.stringify({
       type: 'meeting',
       date: data.result.parameters.date,
-      time: data.result.parameters.time,
-      invitees: data.result.parameters.invitees || ''
+      startTime: data.result.parameters.time[0], // startTime in time array
+      endTime: data.result.parameters.time[1] || '', // endTime in time array
+      invitees: data.result.parameters.invitees || '',
+      description: data.result.parameters.subject || '',
+      location: data.result.parameters.location || ''
     });
     user.save(function(err, found){
     console.log(found);
