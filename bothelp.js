@@ -78,6 +78,7 @@ function meetOrRemind(data, message, user){
     console.log("MESSAGE MEETING: ", data.result.parameters);
     //before sending the confirmation, check to see that the meeting slot is free for all invitees
     resolveConflicts(data.result.parameters);
+
     //then, send confirmation message
     web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
     user.pendingState = JSON.stringify({
