@@ -122,6 +122,8 @@ app.post('/slack/interactive', function(req, res) {
                         'date': '2017-06-19'
                     }
                 }
+
+
                 // Insert the event into the user's primary calendar
                 calendar.events.insert({
                     auth: oauth2Client,
@@ -149,10 +151,40 @@ app.post('/slack/interactive', function(req, res) {
                 });
             }
             else if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'meeting') {
-
+              console.log(payload.original_message.attachments[0].text);
+              let meetingEvent = {
+                'summary': 'EVENT SUMMARY',
+                'location': '',
+                'description': '',
+                'start': {
+                    'date': new Date(),
+                },
+                'end': {
+                    'date': '2017-06-19'
+                }
+              }
+              calendar.events.insert({
+                auth: oauth2Client,
+                'calendarId': 'primary',
+                'resource': meetingEvent
+              }, function(err,resp){
+                if (err) {
+                  console.log("ERROR INSERTING INTO GOOGLE CALENDAR", err);
+                } else{
+                  console.log("MEETING INSERTED INTO GOOGLE CALENDAR", resp);
+                }
+              })
             }
             else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'meeting') {
-
+              var attachment = payload.original_message.attachments[0];
+              delete attachment.actions;
+              attachment.text = 'Cancelled reminder';
+              attachment.color = '#DD4814'
+              res.json({
+                  replace_original: true,
+                  text: 'Cancelled reminder :x:',
+                  attachments: [attachment]
+              })
             }
         }
     })
