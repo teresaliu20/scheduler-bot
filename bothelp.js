@@ -51,10 +51,10 @@ var messageObject = {
 
 var distinguish = function(data, message) {
   if (data.result.action === 'reminder:add'){
-    messageObject.text="reminder";
+    messageObject.attachments[0].text="reminder";
     web.chat.postMessage(message.channel, reminderResponse(data.result.parameters), messageObject);
   } else if (data.result.action === 'meeting:add'){
-    messageObject.text="meeting";
+    messageObject.attachments[0].text="meeting";
     web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
   } else {
     console.log('Action: ', data.result.action);

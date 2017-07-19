@@ -88,12 +88,13 @@ app.post('/slack/interactive', function(req, res) {
             console.log("ERROR FINDING USER", err);
         }
         else {
+            console.log("HEREE", payload.original_message);
             oauth2Client.setCredentials({
                 'access_token': user.google.access_token,
                 'refresh_token': user.google.refresh_token
             });
             // If the user clicked confirm, create Google Calendar event
-            if (payload.actions[0].value === 'confirm' && payload.original_message.text === 'reminder') {
+            if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'reminder') {
                 var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
                 delete attachment.actions; // delete buttons
                 attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
@@ -134,7 +135,7 @@ app.post('/slack/interactive', function(req, res) {
                     }
                 })
             }
-            else if (payload.actions[0].value === 'cancel' && payload.original_message.text === 'reminder') {
+            else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'reminder') {
                 // If the cancel button is pressed instead, cancel the event
                 var attachment = payload.original_message.attachments[0];
                 delete attachment.actions;
@@ -146,10 +147,10 @@ app.post('/slack/interactive', function(req, res) {
                     attachments: [attachment]
                 });
             }
-            else if (payload.actions[0].value === 'confirm' && payload.original_message.text === 'meeting') {
+            else if (payload.actions[0].value === 'confirm' && payload.original_message.attachments[0].text === 'meeting') {
 
             }
-            else if (payload.actions[0].value === 'cancel' && payload.original_message.text === 'meeting') {
+            else if (payload.actions[0].value === 'cancel' && payload.original_message.attachments[0].text === 'meeting') {
 
             }
         }
