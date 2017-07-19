@@ -12,7 +12,7 @@ var userSchema = mongoose.Schema({
       expiry_date: Number
     },
     slackId: String,
-    slackName: String,
+    fullName: String,
     slackDMId: String,
     email: String,
     pendingState: String

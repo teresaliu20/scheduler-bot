@@ -9,6 +9,10 @@ var token = process.env.SLACK_API_TOKEN || '';
 var rtm = new RtmClient(bot_token);
 var web = new WebClient(bot_token);
 
+//import conflict-finding function from ./conflicts
+var conflicts = require('./conflicts');
+var resolveConflicts = conflicts.resolveConflicts;
+
 
 var reminderResponse = function(parameters) {
   var dateStr = (new Date(parameters.date)).toDateString();
@@ -49,18 +53,6 @@ var messageObject = {
   ]
 }
 
-// var distinguish = function(data, message) {
-//   if (data.result.action === 'reminder:add'){
-//     messageObject.attachments[0].text="reminder";
-//     web.chat.postMessage(message.channel, reminderResponse(data.result.parameters), messageObject);
-//   } else if (data.result.action === 'meeting:add'){
-//     messageObject.attachments[0].text="meeting";
-//     web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
-//   } else {
-//     console.log('Action: ', data.result.action);
-//   }
-// }
-
 function meetOrRemind(data, message, user){
   console.log("DATA: ",data);
   if (data.result.actionIncomplete) {
@@ -84,6 +76,9 @@ function meetOrRemind(data, message, user){
   }
   else if (data.result.action === 'meeting:add') {
     console.log("MESSAGE MEETING: ", data.result.parameters);
+    //before sending the confirmation, check to see that the meeting slot is free for all invitees
+    resolveConflicts(data.result.parameters);
+    //then, send confirmation message
     web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
     user.pendingState = JSON.stringify({
       type: 'meeting',

@@ -24,7 +24,6 @@ var Reminder = models.Reminder;
 var Meeting = models.Meeting;
 
 // Redirects to Google OAuth2
-// User must allow slackBot to access their google calendar
 app.get('/google/oauth', function(req, res) {
     var url = oauth2Client.generateAuthUrl({
         access_type: 'offline',
@@ -40,7 +39,7 @@ app.get('/google/oauth', function(req, res) {
     res.redirect(url);
 });
 
-// Handle callback from Google OAuth2
+// Handles callback from Google OAuth2
 app.get('/connect/callback', function(req, res) {
     var authId = JSON.parse(decodeURIComponent(req.query.state)).auth_id;
     var code = req.query.code;
@@ -48,8 +47,6 @@ app.get('/connect/callback', function(req, res) {
         // Now tokens contains an access_token and an optional refresh_token. Save them.
         if (!err) {
             oauth2Client.setCredentials(tokens);
-            // Update the user's information in the database with google token information
-            // This allows us to keep them authorized (Google OAuth)
             User.findByIdAndUpdate(authId, { $set: {google: tokens}}, function(err, user) {
                 if (err) {
                     res.send({success: false, error: err});
@@ -60,34 +57,32 @@ app.get('/connect/callback', function(req, res) {
             })
         }
         else {
-            res.send({success: false, error: err});
+            console.log("ERR", err);
+            res.send({success: false});
         }
     });
 
 })
 
 
-// Handle interactive message actions
+// Route to handle interactive message actions
 app.post('/slack/interactive', function(req, res) {
 
     // Payload contains the interactive message information and event
     var payload = JSON.parse(req.body.payload);
 
-    // Retrieve token associated with user from database
+    // Must retrieve token associated with user stored in database
     User.findOne({slackId: payload.user.id}, function(err, user) {
       let pending;
         if (err) {
             console.log("ERROR FINDING USER", err);
         }
         else {
-            // Since user.pendingState is a JSON string, parse the information
             var pendingState = JSON.parse(user.pendingState);
             // If user hits cancel, update the message text
             if (payload.actions[0].value === 'cancel') {
                 var attachment = payload.original_message.attachments[0];
                 delete attachment.actions;
-                // Check to see if the pending state is a reminder or meeting
-                // Then, respond accordingly
                 if (pendingState.type === 'reminder') {
                     attachment.text = 'Cancelled reminder';
                     attachment.color = '#DD4814';
@@ -130,17 +125,16 @@ app.post('/slack/interactive', function(req, res) {
                     var date = pendingState.date;
                     // Create the event for the Google Calendar API
                     let reminderEvent = {
-                        'summary': subject,
+                        'summary': 'EVENT SUMMARY',
                         'location': '',
                         'description': '',
                         'start': {
-                            'date': date
+                            'date': '2017-06-19'
                         },
                         'end': {
-                            'date': date
+                            'date': '2017-06-19'
                         }
                     }
-                    // Save the reminder to the database
                     var newReminder = new Reminder({
                       subject: pendingState.subject,
                       date: pendingState.date,
@@ -151,7 +145,6 @@ app.post('/slack/interactive', function(req, res) {
                             console.log("ERR", err);
                         }
                         else {
-                          //Insert reminder into user's Google Calendar
                             calendar.events.insert({
                                 auth: oauth2Client,
                                 'calendarId': 'primary',
@@ -168,40 +161,33 @@ app.post('/slack/interactive', function(req, res) {
                     })
                 }
                 else if (pendingState.type === 'meeting') {
+                  console.log('PENDING STATE', pendingState);
                   var startTimeStr = pendingState.date + ' ' + pendingState.startTime; // concatenate date and time to make a date obj later
                   var startTime = new Date(startTimeStr).toISOString(); // create date object for start time
+                  var endTime = (pendingState.endTime === '' ? // if end time isn't specified
+                    new Date(new Date(startTimeStr).getTime() + 30*60*1000).toISOString() : // make end time 30 minutes later than start time
+                    new Date(pendingState.date + ' ' + pendingState.endTime).toISOString()); // otherwise, make endtime as specified
 
-                  // If end time isn't specified, set default end time to 30 minutes after start time
-                  // otherwise, set endtime
-                  var endTime = (pendingState.endTime === '' ?
-                    new Date(new Date(startTimeStr).getTime() + 30*60*1000).toISOString() :
-                    new Date(pendingState.date + ' ' + pendingState.endTime).toISOString());
-
-                  // Format proper title/summary for each event based on the invitee list
-                  // If the invitee list is empty, then title is just 'Meeting'
-                  var title = 'Meeting';
-                  //otherwise, title becomes 'Meeting with ...'
-                  if (pendingState.invitees !== []) {
+                  // format proper title/summary for each event based on the invitee list
+                  var title = 'Meeting'; // if the invitee list is empty, then title is just 'Meeting'
+                  if (pendingState.invitees !== []) { // otherwise, title becomes 'Meeting with ...'
                     title += ' with '
                     for (var i = 0; i < pendingState.invitees.length; i++) { // add all invitees to title
                       // if not yet reached the end of the invitee list or there is only one invitee, then add invitee name to title
                       if (i !== pendingState.invitees.length - 1 || i === pendingState.invitees.length - 1 && i === 0) {
                         title += pendingState.invitees[i]
                       }
-                      // else if at the last name in invitee list, and an 'and' before the end
-                      else {
+                      else { // else if at the last name in invitee list, and an 'and' before the end
                         title = title + ' and ' + pendingState.invitees[i]
                       }
                     }
                   }
-                  // change the text after the the confirm button was clicked to green
-                    attachment.text = 'Meeting set';
-                    attachment.color = '#53B987';
 
-                    // Replace the original interactive message with a new message, displaying confirmation information
+                    attachment.text = 'Meeting set'; // change the text after the the confirm button was clicked
+                    attachment.color = '#53B987' // change the color to green
                     res.json({
-                        replace_original: true,
-                        text: 'Created a ' + title + ' at ' + pendingState.startTime + ':white_check_mark:',
+                        replace_original: true, // replace the original interactive message box with a new messagee
+                        text: 'Created a ' + title + 'at ' + pendingState.startTime + ':white_check_mark:', // display confirmation information
                         attachments: [attachment]
                     });
                     let meetingEvent = {
@@ -215,8 +201,6 @@ app.post('/slack/interactive', function(req, res) {
                             'dateTime': endTime
                         }
                     }
-
-                    // Create and save new meeting to database
                     var newMeeting = new Meeting({
                         date: pendingState.date,
                         startTime: startTime,
@@ -228,7 +212,6 @@ app.post('/slack/interactive', function(req, res) {
                         status: '',
                         createdAt: new Date().toISOString()
                     })
-
                     newMeeting.save(function(err, res) {
                         if (err) {
                             console.log("ERR", err);
@@ -249,9 +232,43 @@ app.post('/slack/interactive', function(req, res) {
                         }
                     })
                 }
+                //added for the time conflict resolution
+            } else if (payload.actions[0].selected_options.value){
+              var selected = JSON.parse(payload.actions[0].selected_options.value)
+              //store the time they have selected as a new meetingEvent
+              var newerMeeting = new Meeting({
+                  date: pendingState.date,
+                  startTime: startTime,
+                  invitees: pendingState.invitees || [],
+                  userId: payload.user.id,
+                  subject: pendingState.description,
+                  location: pendingState.location,
+                  endTime: endTime,
+                  status: '',
+                  createdAt: new Date().toISOString()
+              })
+              newerMeeting.save(function(err, res) {
+                  if (err) {
+                      console.log("ERR", err);
+                  }
+                  else {
+                      calendar.events.insert({
+                          auth: oauth2Client,
+                          'calendarId': 'primary',
+                          'resource': meetingEvent
+                      }, function(err2, resp) {
+                          if (err2) {
+                              console.log("ERROR INSERTING MEETING INTO GOOGLE CALENDAR: ", err2);
+                          }
+                          else {
+                              console.log("MEETING INSERTED INTO GOOGLE CALENDAR", resp);
+                          }
+                      })
+                  }
+              })
+
             }
         }
-        // Reset pending state to an empty string after user has confirmed or cancelled action
         user.pendingState = JSON.stringify({});
         user.save(function(err, found){
             if (err){
