@@ -10,7 +10,6 @@ app.use(bodyParser.urlencoded({extended: false}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 var google = require('googleapis');
-
 var OAuth2 = google.auth.OAuth2;
 var oauth2Client = new OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -18,15 +17,12 @@ var oauth2Client = new OAuth2(
     process.env.DOMAIN + '/connect/callback'
 );
 
-var calendar = google.calendar('v3');
-
 var models = require('./models');
 var User = models.User;
 var Reminder = models.Reminder;
 
 // Redirects to Google OAuth2
 app.get('/google/oauth', function(req, res) {
-    // Generate a redirect url when user logs into google
     var url = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
@@ -34,34 +30,29 @@ app.get('/google/oauth', function(req, res) {
             'https://www.googleapis.com/auth/userinfo.profile',
             'https://www.googleapis.com/auth/calendar'
         ],
-        // Encodes the auth_id from the passed in query that saves current user's id
         state: encodeURIComponent(JSON.stringify({
             auth_id: req.query.auth_id
         }))
     })
-    // Redirect to the generated URL
     res.redirect(url);
 });
 
-// Handles callback created from Google OAuth2 when the user logs in
+// Handles callback from Google OAuth2
 app.get('/connect/callback', function(req, res) {
-    // Decodes the auth_id from query, used to find current user from database
     var authId = JSON.parse(decodeURIComponent(req.query.state)).auth_id;
-    // Authorization code generated from the google server using the request token
     var code = req.query.code;
     console.log("AUTH ID : ", authId);
     oauth2Client.getToken(code, function (err, tokens) {
-        // Now tokens contains an access_token and an optional refresh_token that we save
+        // Now tokens contains an access_token and an optional refresh_token. Save them.
         if (!err) {
             oauth2Client.setCredentials(tokens);
             console.log("TOKENS: ",tokens);
-            // Save the tokens to the current user in the database to use later
             User.findByIdAndUpdate(authId, { $set: {google: tokens}}, function(err, user) {
                 if (err) {
                     res.send({success: false, error: err});
                 }
                 else {
-                    console.log('FOUND USER', user);
+                    console.log(user);
                     res.send({success: true});
                 }
             })
@@ -73,6 +64,7 @@ app.get('/connect/callback', function(req, res) {
     });
 
 })
+
 
 // Route to handle interactive message actions
 app.post('/slack/interactive', function(req, res) {

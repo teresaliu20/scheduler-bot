@@ -6,9 +6,6 @@ var WebClient = require('@slack/client').WebClient;
 var bot_token = process.env.SLACK_BOT_TOKEN || '';
 var token = process.env.SLACK_API_TOKEN || '';
 
-var models = require('./models');
-var User = models.User;
-
 var rtm = new RtmClient(bot_token);
 var web = new WebClient(bot_token);
 
@@ -57,31 +54,24 @@ var distinguish = function(data, message){
   web.chat.postMessage(message.channel, response(data.result.parameters), messageObject)
 }
 
-function meetOrRemind(data, message, user){
+function meetOrRemind(data, message){
   console.log(data);
   if (data.result.actionIncomplete) {
     rtm.sendMessage(data.result.fulfillment.speech, message.channel);
   }
   else if (data.result.action === 'reminder:add' || data.result.action === 'meeting:add') {
     distinguish(data, message);
-    user.pendingState = JSON.stringify({
-      date: data.result.parameters.date,
-      subject: data.result.parameters.subject
-    });
-
-    user.save(function(err, found){
-      console.log(found);
-      if (err){
-        console.log('error finding user with id', user._id);
-      } else {
-        console.log('user found and pending state set! yay.');
-      }
-    })
-
   } else if (!data.result.actionIncomplete){
     rtm.sendMessage(data.result.fulfillment.speech, message.channel);
   } else {
     rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
+
+    // if(data.result.fulfillment.speech){
+    //   rtm.sendMessage(data.result.fulfillment.speech, message.channel);
+    //   // return;
+    // } else {
+    //   rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
+    // }
   }
 }
 
