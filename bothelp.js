@@ -16,19 +16,20 @@ var reminderResponse = function(parameters) {
   return words;
 }
 
-var meetingResponse = function(parameters) {
+var meetingResponse = function(parameters, user) {
   var dateStr = moment(parameters.date, "America/Los_Angeles").format('dddd, LL'); // format: Wednesday, July 19, 2017
-console.log('timeStr', parameters.time[0]);
   var timeStr = parameters.time[0].substring(0, 5) + (parseInt(parameters.time[0].substring(0, 2)) > 11? ' PM' : ' AM') // format: 1:49 PM
   var invitees = '';
-  for (var i = 0; i < parameters.invitees.length; i++) { // add all invitees to invitees
+  var pendingStateObj = JSON.parse(user.pendingState);
+  for (var i = 0; i < pendingStateObj.invitees.length; i++) { // add all invitees to invitees
     // if not yet reached the end of the invitee list or there is only one invitee, then add invitee name to title
-    if (i !== parameters.invitees.length - 1 || i === parameters.invitees.length - 1 && i === 0) {
-      invitees += parameters.invitees[i]
+    let name = rtm.dataStore.getUserById(pendingStateObj.invitees[i]).profile.real_name;
+    if (i !== pendingStateObj.invitees.length - 1 || i === pendingStateObj.invitees.length - 1 && i === 0) {
+      invitees += name;
     }
     // else if at the last name in invitee list, and an 'and' before the end
     else {
-      invitees = invitees + ' and ' + parameters.invitees[i]
+      invitees = invitees + ' and ' + name;
     }
   }
   var words = 'Schedule a meeting with ' + invitees + ' on ' + dateStr + ' at ' + timeStr;
@@ -85,7 +86,6 @@ function meetOrRemind(data, message, user){
     })
   }
   else if (data.result.action === 'meeting:add') {
-    web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), messageObject);
 
     var slackIdsInvitees = JSON.parse(user.pendingState);
 
@@ -98,13 +98,11 @@ function meetOrRemind(data, message, user){
       description: data.result.parameters.subject || '',
       location: data.result.parameters.location || ''
     });
-    user.save(function(err, found){
-    if (err){
-      console.log('error finding user with id', user._id);
-      } else {
-      console.log('2. user found and pending state set! yay.');
-      }
+    user.save()
+    .then(savedUser => {
+      web.chat.postMessage(message.channel, meetingResponse(data.result.parameters, savedUser), messageObject);
     })
+    .catch(err => console.log("ERROR: ", err))
   }
   else {
     rtm.sendMessage('I don\'t understand that. Sorry!', message.channel);
