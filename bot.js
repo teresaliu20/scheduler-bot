@@ -11,6 +11,7 @@ var axios = require('axios');
 
 // Mongoose Setup
 var mongoose = require('mongoose');
+mongoose.Promise = global.Promise;
 var connect = process.env.MONGODB_URI || '';
 mongoose.connect(connect);
 var models = require('./models');
@@ -57,47 +58,35 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       var userInfo = rtm.dataStore.getUserById(message.user);
 
       //store the user's information in the database if not already stored
-      var newUser = new User({
-          slackId: message.user,
-          slackName: userInfo.name,
-          email: userInfo.profile.email,
-          pendingState: JSON.stringify({
-            invitees: []
-          })
-      });
-      newUser.save(function(err, user) {
-        if (err) {
-          res.send({failure: true, error: err, text: "error"});
-        }
-        else {
-          rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + user._id, message.channel);
-        }
-      });
+      rtm.sendMessage('Click on this link to log into your google account: ' + process.env.DOMAIN + '/google/oauth?auth_id=' + message.user, message.channel);
     }
     else {
       // send message text as query to Paul, the Api.Ai schedule bot brain
 
       // Replace the <@SlackId> with the user's real name for Api.Ai
       var pendingStateObj = JSON.parse(user.pendingState);
-
       if (!pendingStateObj.type && message.text.indexOf('<@U') > -1) {
         var toReplace = message.text.substring(message.text.indexOf('<@U'), message.text.indexOf('<@U') + 12);
         let userInfo = rtm.dataStore.getUserById(toReplace.substring(2, 11));
         message.text = message.text.replace(toReplace, userInfo.profile.real_name);
+        let slackIdFound = toReplace.substring(2, 11);
 
-        pendingStateObj.invitees.push(toReplace.substring(2, 11));
-        console.log('pendingStateObj', pendingStateObj);
-        var newInvitees = pendingStateObj.invitees;
-        user.pendingState = JSON.stringify({
-          invitees: newInvitees
+
+        User.findOne({slackId: slackIdFound})
+        .then(user => {
+          console.log("HEREEEE", user);
+          pendingStateObj.invitees.push(user.email);
+          var newInvitees = pendingStateObj.invitees;
+          user.pendingState = JSON.stringify({
+            invitees: newInvitees
+          });
+          return user.save()
         })
-        user.save(function(err, res) {
-          if (err) {
-            console.log("Error saving new invitees");
-          }
-          else {
-            console.log("NEW INVITEES SAVED")
-          }
+        .then(res => {
+          console.log("NEW INVITEES SAVED");
+        })
+        .catch(err => {
+          console.log("ERROR SAVING NEW INVITEES");
         })
       }
 
