@@ -259,7 +259,6 @@ app.post('/slack/interactive', function(req, res) {
                         'email': singleUser.email
                       });
                     });
-                    console.log("ATTENDEES: ", attendees)
                     meetingEvent = {
                         'summary': title,
                         'location': pendingState.location,
@@ -307,14 +306,14 @@ app.post('/slack/interactive', function(req, res) {
       }
       // Reset pending state to an empty string after user has confirmed or cancelled action
       user.pendingState = JSON.stringify({
-          invitees: []
+        invitees: []
       });
       user.save(function(err, found){
-          if (err){
-              console.log('error finding user with id', user._id);
-          } else {
-              console.log('3. user found and pending state cleared! yay.');
-          }
+        if (err){
+            console.log('error finding user with id', user._id);
+        } else {
+            console.log('3. user found and pending state cleared! yay.');
+        }
       });
   })
 });

@@ -45,7 +45,6 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 
 // Wait for the client to fully connect before you can send messages
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
-  console.log('Message', message);
   var dm = rtm.dataStore.getDMByUserId(message.user);
   if (!dm || dm.id !== message.channel) {
     return;
@@ -79,11 +78,11 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         // Save the invitee's slackId
         newInviteesArray.push(slackIdFound);
       }
-
-      user.pendingState = JSON.stringify({
-        'invitees': pendingStateObj.invitees.concat(newInviteesArray)
-      });
-
+      // check if the action is a meeting
+      if (pendingStateObj.invitees) {
+        pendingStateObj.invitees = pendingStateObj.invitees.concat(newInviteesArray);
+        user.pendingState = JSON.stringify(pendingStateObj);
+      }
       user.save()
       .then(user => {
         return axios.get('https://api.api.ai/api/query', {
