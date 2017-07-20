@@ -2,6 +2,7 @@ var express = require('express');
 var app = express();
 var axios = require('axios');
 var path = require('path');
+var moment = require('moment-timezone');
 require('./bot.js');
 
 var bodyParser = require('body-parser');
@@ -22,6 +23,9 @@ var models = require('./models');
 var User = models.User;
 var Reminder = models.Reminder;
 var Meeting = models.Meeting;
+
+var bothelp = require('./bothelp');
+var rtm = bothelp.rtm;
 
 // Redirects to Google OAuth2
 // User must allow slackBot to access their google calendar
@@ -66,7 +70,6 @@ app.get('/connect/callback', function(req, res) {
 
 })
 
-
 // Handle interactive message actions
 app.post('/slack/interactive', function(req, res) {
 
@@ -89,7 +92,8 @@ app.post('/slack/interactive', function(req, res) {
                 // Check to see if the pending state is a reminder or meeting
                 // Then, respond accordingly
                 if (pendingState.type === 'reminder') {
-                    attachment.text = 'Cancelled reminder';
+                    var dateStr = moment(pendingState.date, "America/Los_Angeles").format('dddd, LL');
+                    attachment.text = 'Cancelled reminder: ' + pendingState.subject + ' on ' + dateStr;
                     attachment.color = '#DD4814';
                     res.json({
                         replace_original: true,
@@ -98,11 +102,27 @@ app.post('/slack/interactive', function(req, res) {
                     });
                 }
                 else if (pendingState.type === 'meeting') {
+                    var timeStr = pendingState.startTime.substring(0, 5) + (parseInt(pendingState.startTime.substring(0, 2)) > 11? ' PM' : ' AM') // format: 1:49 PM
+                    var title = 'Meeting';
+                    //otherwise, title becomes 'Meeting with ...'
+                    if (pendingState.invitees !== []) {
+                      title += ' with '
+                      for (var i = 0; i < pendingState.invitees.length; i++) { // add all invitees to title
+                        // if not yet reached the end of the invitee list or there is only one invitee, then add invitee name to title
+                        if (i !== pendingState.invitees.length - 1 || i === pendingState.invitees.length - 1 && i === 0) {
+                          title += pendingState.invitees[i]
+                        }
+                        // else if at the last name in invitee list, and an 'and' before the end
+                        else {
+                          title = title + ' and ' + pendingState.invitees[i]
+                        }
+                      }
+                    }
                     attachment.text = 'Cancelled meeting';
                     attachment.color = '#DD4814';
                     res.json({
                         replace_original: true,
-                        text: 'Cancelled meeting :x:',
+                        text: 'Cancelled ' + title + ' at ' + timeStr + ' :x:',
                         attachments: [attachment]
                     });
                 }
@@ -117,7 +137,8 @@ app.post('/slack/interactive', function(req, res) {
                 delete attachment.actions; // delete buttons
 
                 if (pendingState.type === 'reminder') {
-                    attachment.text = 'Reminder set'; // change the text after the the confirm button was clicked
+                    var dateStr = moment(pendingState.date, "America/Los_Angeles").format('dddd, LL');
+                    attachment.text = 'Reminder set: ' + pendingState.subject + ' on ' + dateStr; // change the text after the the confirm button was clicked
                     attachment.color = '#53B987' // change the color to green
                     res.json({
                         replace_original: true, // replace the original interactive message box with a new messagee
@@ -179,31 +200,42 @@ app.post('/slack/interactive', function(req, res) {
 
                   // Format proper title/summary for each event based on the invitee list
                   // If the invitee list is empty, then title is just 'Meeting'
-                  var title = 'Meeting';
+                  var title = 'Meeting: ' + rtm.dataStore.getUserById(user.slackId).profile.real_name;
                   //otherwise, title becomes 'Meeting with ...'
                   if (pendingState.invitees !== []) {
-                    title += ' with '
                     for (var i = 0; i < pendingState.invitees.length; i++) { // add all invitees to title
                       // if not yet reached the end of the invitee list or there is only one invitee, then add invitee name to title
-                      if (i !== pendingState.invitees.length - 1 || i === pendingState.invitees.length - 1 && i === 0) {
-                        title += pendingState.invitees[i]
+                      if (i !== pendingState.invitees.length - 1) {
+                        let userInfo = rtm.dataStore.getUserById(pendingState.invitees[i]);
+                        title += ", " + userInfo.profile.real_name;
                       }
                       // else if at the last name in invitee list, and an 'and' before the end
                       else {
-                        title = title + ' and ' + pendingState.invitees[i]
+                        let userInfo = rtm.dataStore.getUserById(pendingState.invitees[i]);
+                        title = title + ' and ' + userInfo.profile.real_name;
                       }
                     }
                   }
                   // change the text after the the confirm button was clicked to green
                     attachment.text = 'Meeting set';
                     attachment.color = '#53B987';
-
+                    var timeStr = pendingState.startTime.substring(0, 5) + (parseInt(pendingState.startTime.substring(0, 2)) > 11? ' PM' : ' AM') // format: 1:49 PM
                     // Replace the original interactive message with a new message, displaying confirmation information
                     res.json({
                         replace_original: true,
-                        text: 'Created a ' + title + ' at ' + pendingState.startTime + ':white_check_mark:',
+                        text: 'Created a ' + title + ' at ' + timeStr + ':white_check_mark:',
                         attachments: [attachment]
                     });
+
+                    // Generate array of attendees
+                    var attendees = [];
+                    for (var i = 0; i < pendingState.invitees.length; i++) {
+                        let user = rtm.dataStore.getUserById(pendingState.invitees[i]);
+                        attendees.push({
+                            'email' : user.profile.email
+                        });
+                    }
+    
                     let meetingEvent = {
                         'summary': title,
                         'location': pendingState.location,
@@ -213,14 +245,15 @@ app.post('/slack/interactive', function(req, res) {
                         },
                         'end': {
                             'dateTime': endTime
-                        }
+                        },
+                        'attendees': attendees
                     }
 
                     // Create and save new meeting to database
                     var newMeeting = new Meeting({
                         date: pendingState.date,
                         startTime: startTime,
-                        invitees: pendingState.invitees || [],
+                        invitees: attendees,
                         userId: payload.user.id,
                         subject: pendingState.description,
                         location: pendingState.location,
@@ -252,12 +285,14 @@ app.post('/slack/interactive', function(req, res) {
             }
         }
         // Reset pending state to an empty string after user has confirmed or cancelled action
-        user.pendingState = JSON.stringify({});
+        user.pendingState = JSON.stringify({
+            invitees: []
+        });
         user.save(function(err, found){
             if (err){
                 console.log('error finding user with id', user._id);
             } else {
-                console.log('user found and pending state cleared! yay.');
+                console.log('3. user found and pending state cleared! yay.');
             }
         });
     })
