@@ -54,13 +54,25 @@ app.get('/connect/callback', function(req, res) {
             oauth2Client.setCredentials(tokens);
             // Update the user's information in the database with google token information
             // This allows us to keep them authorized (Google OAuth)
-            User.findByIdAndUpdate(authId, { $set: {google: tokens}}, function(err, user) {
-                if (err) {
-                    res.send({success: false, error: err});
-                }
-                else {
-                    res.send({success: true});
-                }
+            
+            var newUser = new User({
+                slackId: authId,
+                slackName: rtm.dataStore.getUserById(authId).profile.real_name, 
+                email: rtm.dataStore.getUserById(authId).profile.email,
+                pendingState: JSON.stringify({
+                    invitees: []
+                }),
+                google: tokens
+            });
+
+            newUser.save()
+            .then(result => {
+                console.log("NEW USER SAVED WITH GOOGLE INFORMATION")
+                res.send({success: true, message: "Successfully logged into google"})
+            })
+            .catch(err => {
+                console.log("ERROR SAVING USER WITH GOOGLE INFORMATION")
+                res.send({success: false, message: "Error trying to log into google"})
             })
         }
         else {
@@ -128,10 +140,8 @@ app.post('/slack/interactive', function(req, res) {
                 }
             }
             else if (payload.actions[0].value === 'confirm') {
-                oauth2Client.setCredentials({
-                    'access_token': user.google.access_token,
-                    'refresh_token': user.google.refresh_token
-                });
+
+                oauth2Client.setCredentials(user.google);
 
                 var attachment = payload.original_message.attachments[0]; // make a copy of attachments (the interactive part)
                 delete attachment.actions; // delete buttons
@@ -228,13 +238,7 @@ app.post('/slack/interactive', function(req, res) {
                     });
 
                     // Generate array of attendees
-                    var attendees = [];
-                    for (var i = 0; i < pendingState.invitees.length; i++) {
-                        let user = rtm.dataStore.getUserById(pendingState.invitees[i]);
-                        attendees.push({
-                            'email' : user.profile.email
-                        });
-                    }
+                    console.log("UPDATED PENDING INVITEES: ", pendingState.invitees)
     
                     let meetingEvent = {
                         'summary': title,
