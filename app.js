@@ -12,6 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 var google = require('googleapis');
 var calendar = google.calendar('v3');
+var plus = google.plus('v1');
 var OAuth2 = google.auth.OAuth2;
 var oauth2Client = new OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -35,7 +36,8 @@ app.get('/google/oauth', function(req, res) {
         prompt: 'consent',
         scope: [
             'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/calendar'
+            'https://www.googleapis.com/auth/calendar',
+            'email'
         ],
         state: encodeURIComponent(JSON.stringify({
             auth_id: req.query.auth_id
@@ -54,12 +56,26 @@ app.get('/connect/callback', function(req, res) {
             oauth2Client.setCredentials(tokens);
             // Update the user's information in the database with google token information
             // This allows us to keep them authorized (Google OAuth)
-            User.findByIdAndUpdate(authId, { $set: {google: tokens}}, function(err, user) {
+            User.findById(authId, function(err, user) {
                 if (err) {
                     res.send({success: false, error: err});
                 }
                 else {
-                    res.send({success: true});
+                    plus.people.get({userId: 'me', auth: oauth2Client}, function (err, response) {
+                        if (err) {
+                            console.log('ERROR', err);
+                        }
+                        else {
+                            User.update({_id: authId}, { $set: { google: tokens, email: response.emails[0].value }}, function(err, user2) {
+                              if (err) {
+                                console.log('ERROR', err);
+                              }
+                              else {
+                                  res.send('Authentication successful')
+                              }
+                            })
+                        }
+                    });
                 }
             })
         }
@@ -235,7 +251,7 @@ app.post('/slack/interactive', function(req, res) {
                             'email' : user.profile.email
                         });
                     }
-    
+
                     let meetingEvent = {
                         'summary': title,
                         'location': pendingState.location,

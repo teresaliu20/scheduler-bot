@@ -60,7 +60,6 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       var newUser = new User({
           slackId: message.user,
           slackName: userInfo.name,
-          email: userInfo.profile.email,
           pendingState: JSON.stringify({
             invitees: []
           })
@@ -80,18 +79,18 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       // Replace the <@SlackId> with the user's real name for Api.Ai
       var pendingStateObj = JSON.parse(user.pendingState);
 
-      if (!pendingStateObj.type && message.text.indexOf('<@U') > -1) {
-        var toReplace = message.text.substring(message.text.indexOf('<@U'), message.text.indexOf('<@U') + 12);
-        let userInfo = rtm.dataStore.getUserById(toReplace.substring(2, 11));
-        message.text = message.text.replace(toReplace, userInfo.profile.real_name);
+      if (!pendingStateObj.type && message.text.indexOf('<@U') > -1) { // if detect a slackID
+        var toReplace = message.text.substring(message.text.indexOf('<@U'), message.text.indexOf('<@U') + 12); // separate the slackID
+        let userInfo = rtm.dataStore.getUserById(toReplace.substring(2, 11)); // userInfo object that contains their profile
+        message.text = message.text.replace(toReplace, userInfo.profile.real_name); // get user's real name from their slack profile
 
-        pendingStateObj.invitees.push(toReplace.substring(2, 11));
+        pendingStateObj.invitees.push(toReplace.substring(2, 11)); // push user's ID into invitees's list
         console.log('pendingStateObj', pendingStateObj);
         var newInvitees = pendingStateObj.invitees;
         user.pendingState = JSON.stringify({
           invitees: newInvitees
         })
-        user.save(function(err, res) {
+        user.save(function(err, res) { // save list of invitees onto mongoDB
           if (err) {
             console.log("Error saving new invitees");
           }
