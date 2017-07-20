@@ -3,9 +3,7 @@
 var models = require('./models');
 var Meeting = models.Meeting;
 
-// parse pendingState invitees, which is an array of slackIds
-var pendingState = JSON.stringify(user.pendingState)
-var invitees = pendingState.invitees;
+//QUESTION: Should I be searching with data.result.parameters or with pendingState?
 
 // set an empty array to catch all conflicts, and another for resolutions
 var conflict = [];
@@ -13,6 +11,10 @@ var resolutions = [];
 
 // get the planned meeting duration
 var duration = ( pendingState.endTime - pendingState.startTime )|| 60*60*1000
+
+// parse pendingState invitees, which is an array of slackIds
+var pendingState = JSON.stringify(user.pendingState)
+var invitees = pendingState.invitees;
 
 // Search all meetings by invitees
 // Loop through invitees
@@ -38,9 +40,8 @@ invitees.forEach(function(invitee){
     }
   })
 });
-//then, send the user an interactive message so they can choose a new time slot
 
-// Check start and end times
+// Convert start and end times for each conflict to milliseconds
 var conflictFix = conflict.map(function(meeting){
   var start = (new Date(meeting.startTime)).toString;
   var end = (new Date(meeting.endTime)).toString || (start + 30*60*1000);
@@ -78,7 +79,7 @@ var responseObj = {
                     "name": "times_list",
                     "text": "Pick a time...",
                     "type": "select",
-                    "options": resolutions
+                    "options": resolutions.slice(0,10)
                 }
             ]
         }
@@ -89,7 +90,9 @@ web.chat.postMessage(message.channel, meetingResponse(data.result.parameters), r
 
 // when user clicks, make new meeting with the time from that timeslot
 
-function resolveConflicts(parameters){
+function resolveConflicts(parameters, user){
+
+
 
 };
 
