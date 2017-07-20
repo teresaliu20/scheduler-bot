@@ -245,65 +245,75 @@ app.post('/slack/interactive', function(req, res) {
                   });
 
                   // Generate array of attendees
-                  console.log("UPDATED PENDING INVITEES: ", pendingState.invitees)
-                  let meetingEvent = {
-                      'summary': title,
-                      'location': pendingState.location,
-                      'description': pendingState.description,
-                      'start': {
-                          'dateTime': startTime
-                      },
-                      'end': {
-                          'dateTime': endTime
-                      },
-                      'attendees': attendees
-                  }
-
-                  // Create and save new meeting to database
-                  var newMeeting = new Meeting({
-                      date: pendingState.date,
-                      startTime: startTime,
-                      invitees: attendees,
-                      userId: payload.user.id,
-                      subject: pendingState.description,
-                      location: pendingState.location,
-                      endTime: endTime,
-                      status: '',
-                      createdAt: new Date().toISOString()
+                  var attendees = [];
+                  var findUserPromises = [];
+                  var meetingEvent;
+                  pendingState.invitees.forEach((inviteeSlackId) => {
+                    findUserPromises.push(User.findOne({slackId: inviteeSlackId}))
                   })
 
-                  newMeeting.save(function(err, res) {
-                      if (err) {
-                          console.log("ERR", err);
-                      }
-                      else {
-                          calendar.events.insert({
-                              auth: oauth2Client,
-                              'calendarId': 'primary',
-                              'resource': meetingEvent
-                          }, function(err, resp) {
-                              if (err) {
-                                  console.log("ERROR INSERTING MEETING INTO GOOGLE CALENDAR: ", err);
-                              }
-                              else {
-                                  console.log("MEETING INSERTED INTO GOOGLE CALENDAR", resp);
-                              }
-                          })
-                      }
+                  Promise.all(findUserPromises)
+                  .then(usersArray => {
+                    usersArray.forEach(singleUser => {
+                      attendees.push({
+                        'email': singleUser.email
+                      });
+                    });
+                    meetingEvent = {
+                        'summary': title,
+                        'location': pendingState.location,
+                        'description': pendingState.description,
+                        'start': {
+                            'dateTime': startTime
+                        },
+                        'end': {
+                            'dateTime': endTime
+                        },
+                        'attendees': attendees
+                    }
+
+                    // Create and save new meeting to database
+                    let newMeeting = new Meeting({
+                        date: pendingState.date,
+                        startTime: startTime,
+                        invitees: attendees,
+                        userId: payload.user.id,
+                        subject: pendingState.description,
+                        location: pendingState.location,
+                        endTime: endTime,
+                        status: '',
+                        createdAt: new Date().toISOString()
+                    })
+                    return newMeeting.save()
                   })
+                  .then(result => {
+                    calendar.events.insert({
+                        auth: oauth2Client,
+                        'calendarId': 'primary',
+                        'resource': meetingEvent
+                    }, function(err, resp) {
+                        if (err) {
+                            console.log("ERROR INSERTING MEETING INTO GOOGLE CALENDAR: ", err);
+                        }
+                        else {
+                            console.log("MEETING INSERTED INTO GOOGLE CALENDAR", resp);
+                        }
+                    });
+                  })
+                  .catch(err => console.log("ERROR: ", err))
               }
           }
       }
       // Reset pending state to an empty string after user has confirmed or cancelled action
       user.pendingState = JSON.stringify({
-          invitees: []
+        invitees: []
       });
       user.save(function(err, found){
-          if (err){
-              console.log('error finding user with id', user._id);
-          } else {
-              console.log('3. user found and pending state cleared! yay.');
-          }
+        if (err){
+            console.log('error finding user with id', user._id);
+        } else {
+            console.log('3. user found and pending state cleared! yay.');
+        }
       });
   })
 });
