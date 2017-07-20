@@ -45,7 +45,6 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 
 // Wait for the client to fully connect before you can send messages
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
-  console.log('Message', message);
   var dm = rtm.dataStore.getDMByUserId(message.user);
   if (!dm || dm.id !== message.channel) {
     return;
@@ -63,34 +62,30 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     else {
       // send message text as query to Paul, the Api.Ai schedule bot brain
 
-      // Replace the <@SlackId> with the user's real name for Api.Ai
+      // Parse the pending state into an object to edit
       var pendingStateObj = JSON.parse(user.pendingState);
-      if (!pendingStateObj.type && message.text.indexOf('<@U') > -1) {
-        var toReplace = message.text.substring(message.text.indexOf('<@U'), message.text.indexOf('<@U') + 12);
-        let userInfo = rtm.dataStore.getUserById(toReplace.substring(2, 11));
-        message.text = message.text.replace(toReplace, userInfo.profile.real_name);
+      // Keep track of the new invitees from the message.text
+      var newInviteesArray = [];
+      // Replace the slack ids in message.text with the user's real names
+      while (!pendingStateObj.type && message.text.indexOf('<@U') > -1) {
+        // Find the next slack id in the message.text
+        let toReplace = message.text.substring(message.text.indexOf('<@U'), message.text.indexOf('<@U') + 12);
         let slackIdFound = toReplace.substring(2, 11);
-
-      
-        User.findOne({slackId: slackIdFound})
-        .then(user => {
-          console.log("HEREEEE", user);
-          pendingStateObj.invitees.push(user.email);
-          var newInvitees = pendingStateObj.invitees;
-          user.pendingState = JSON.stringify({
-            invitees: newInvitees
-          });
-          return user.save()
-        })
-        .then(res => {
-          console.log("NEW INVITEES SAVED");
-        })
-        .catch(err => {
-          console.log("ERROR SAVING NEW INVITEES");
-        })
+        // Get the user info from the slack id and the rtm dataStore
+        let userInfo = rtm.dataStore.getUserById(slackIdFound);
+        // Replace the text with the user's real name
+        message.text = message.text.replace(toReplace, userInfo.profile.real_name);
+        // Save the invitee's slackId
+        newInviteesArray.push(slackIdFound);
       }
-
-      axios.get('https://api.api.ai/api/query', {
+      // check if the action is a meeting
+      if (pendingStateObj.invitees) {
+        pendingStateObj.invitees = pendingStateObj.invitees.concat(newInviteesArray);
+        user.pendingState = JSON.stringify(pendingStateObj);
+      }
+      user.save()
+      .then(user => {
+        return axios.get('https://api.api.ai/api/query', {
           params: {
             v: '20150910',
             lang: 'en',
@@ -102,24 +97,17 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
             'Authorization': `Bearer ${process.env.API_AI_TOKEN}`
           }
         })
+      })
       .then(({ data }) => {
-
-        User.findOne({slackId: message.user}, function(err, user){
-          var id = user._id;
-          if (err){
-            console.log('Database error', err);
-          } else {
-            // check if the user has not confirmed or cancelled a previous action
-            console.log('JSON', JSON.parse(user.pendingState).invitees);
-            if (JSON.parse(user.pendingState).type) { // if pending state has not been cleared
-              rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
-              return;
-            }
-            // At this point, the user has no pending actions,
-            // so we allow them to make meetings and reminders using meetOrRemind
-            meetOrRemind( data, message, user );
+        User.findOne({slackId: message.user}, (err, currUser) => {
+          if (JSON.parse(user.pendingState).type) { // if pending state has not been cleared
+            rtm.sendMessage(`Sorry! Looks like you haven't confirmed or cancelled our last task! Please pick an action to continue.`, message.channel);
             return;
           }
+          // At this point, the user has no pending actions,
+          // so we allow them to make meetings and reminders using meetOrRemind
+          meetOrRemind( data, message, currUser );
+          return;
         })
       })
       .catch((err) => {
