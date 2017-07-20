@@ -65,7 +65,6 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
 
       // Replace the <@SlackId> with the user's real name for Api.Ai
       var pendingStateObj = JSON.parse(user.pendingState);
-
       if (!pendingStateObj.type && message.text.indexOf('<@U') > -1) {
         var toReplace = message.text.substring(message.text.indexOf('<@U'), message.text.indexOf('<@U') + 12);
         let userInfo = rtm.dataStore.getUserById(toReplace.substring(2, 11));

@@ -12,6 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 var google = require('googleapis');
 var calendar = google.calendar('v3');
+var plus = google.plus('v1');
 var OAuth2 = google.auth.OAuth2;
 var oauth2Client = new OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -35,7 +36,8 @@ app.get('/google/oauth', function(req, res) {
         prompt: 'consent',
         scope: [
             'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/calendar'
+            'https://www.googleapis.com/auth/calendar',
+            'email'
         ],
         state: encodeURIComponent(JSON.stringify({
             auth_id: req.query.auth_id
@@ -54,25 +56,30 @@ app.get('/connect/callback', function(req, res) {
             oauth2Client.setCredentials(tokens);
             // Update the user's information in the database with google token information
             // This allows us to keep them authorized (Google OAuth)
-            
-            var newUser = new User({
-                slackId: authId,
-                slackName: rtm.dataStore.getUserById(authId).profile.real_name, 
-                email: rtm.dataStore.getUserById(authId).profile.email,
-                pendingState: JSON.stringify({
-                    invitees: []
-                }),
-                google: tokens
-            });
+            plus.people.get({userId: 'me', auth: oauth2Client}, function(err, response) {
+              if (err) {
+                console.log('error', err);
+              }
+              else {
+                var newUser = new User({
+                    slackId: authId,
+                    slackName: rtm.dataStore.getUserById(authId).profile.real_name, 
+                    email: response.emails[0].value,
+                    pendingState: JSON.stringify({
+                        invitees: []
+                    }),
+                    google: tokens
+                });
 
-            newUser.save()
-            .then(result => {
-                console.log("NEW USER SAVED WITH GOOGLE INFORMATION")
-                res.send({success: true, message: "Successfully logged into google"})
-            })
-            .catch(err => {
-                console.log("ERROR SAVING USER WITH GOOGLE INFORMATION")
-                res.send({success: false, message: "Error trying to log into google"})
+                newUser.save()
+                .then(result => {
+                    console.log("NEW USER SAVED WITH GOOGLE INFORMATION")
+                    res.send({success: true, message: "Successfully logged into google"})
+                })
+                .catch(err => {
+                    console.log("ERROR SAVING USER WITH GOOGLE INFORMATION")
+                    res.send({success: false, message: "Error trying to log into google"})
+                }
             })
         }
         else {
@@ -239,7 +246,6 @@ app.post('/slack/interactive', function(req, res) {
 
                     // Generate array of attendees
                     console.log("UPDATED PENDING INVITEES: ", pendingState.invitees)
-    
                     let meetingEvent = {
                         'summary': title,
                         'location': pendingState.location,
