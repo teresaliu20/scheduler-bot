@@ -63,7 +63,8 @@ var messageObject = {
 }
 
 function meetOrRemind(data, message, user){
-  if (JSON.parse(user.pendingState).invitees.length === 0 && data.result.action === "meeting:add") {
+  console.log("PENDING STATE", user.pendingState);
+  if (!(JSON.parse(user.pendingState).invitees.length) && data.result.action === "meeting:add") {
     rtm.sendMessage("With whom do you want to meet?", message.channel);
   }
   else if (data.result.actionIncomplete) {
