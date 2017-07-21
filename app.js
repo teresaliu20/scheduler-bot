@@ -27,7 +27,8 @@ var Meeting = models.Meeting;
 
 var bothelp = require('./bothelp');
 var rtm = bothelp.rtm;
-
+var availabilityChecker = require('./availabilityChecker');
+var checkFreeBusy = availabilityChecker.checkFreeBusy;
 // Redirects to Google OAuth2
 // User must allow slackBot to access their google calendar
 app.get('/google/oauth', function(req, res) {
@@ -254,6 +255,7 @@ app.post('/slack/interactive', function(req, res) {
 
                   Promise.all(findUserPromises)
                   .then(usersArray => {
+                    var availabilities = checkFreeBusy(usersArray, oauth2Client, calendar, startTime, endTime);
                     usersArray.forEach(singleUser => {
                       attendees.push({
                         'email': singleUser.email
