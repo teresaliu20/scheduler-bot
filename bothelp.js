@@ -17,6 +17,7 @@ var reminderResponse = function(parameters) {
 }
 
 var meetingResponse = function(parameters, user) {
+  console.log("DATE TO MEET: ", parameters.date)
   var dateStr = moment(parameters.date, "America/Los_Angeles").format('dddd, LL'); // format: Wednesday, July 19, 2017
   var timeStr = parameters.time[0].substring(0, 5) + (parseInt(parameters.time[0].substring(0, 2)) > 11? ' PM' : ' AM') // format: 1:49 PM
   var invitees = '';

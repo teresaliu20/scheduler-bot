@@ -28,7 +28,7 @@ var Meeting = models.Meeting;
 var bothelp = require('./bothelp');
 var rtm = bothelp.rtm;
 var availabilityChecker = require('./availabilityChecker');
-var checkFreeBusy = availabilityChecker.checkFreeBusy;
+var checkAvailabilities = availabilityChecker.checkAvailabilities;
 // Redirects to Google OAuth2
 // User must allow slackBot to access their google calendar
 app.get('/google/oauth', function(req, res) {
@@ -95,6 +95,7 @@ app.post('/slack/interactive', function(req, res) {
 
   // Payload contains the interactive message information and event
   var payload = JSON.parse(req.body.payload);
+  console.log("PAYLOAD: ", payload)
 
   // Retrieve token associated with user from database
   User.findOne({slackId: payload.user.id}, function(err, user) {
@@ -254,14 +255,21 @@ app.post('/slack/interactive', function(req, res) {
                   })
 
                   Promise.all(findUserPromises)
-                  .then(usersArray => {
-                    var availabilities = findTimes(usersArray, oauth2Client, calendar, startTime, endTime);
-                    usersArray.forEach(singleUser => {
+                  .then(userArray => {
+                    // Keep track of the attendees with emails
+                    userArray.forEach(singleUser => {
                       attendees.push({
                         'email': singleUser.email
                       });
                     });
-                    meetingEvent = {
+                    // Find time slots during which every invitee is available
+                    return checkAvailabilities(userArray, oauth2Client, calendar, startTime, endTime);
+                  })
+                  .then(possibleTimeSlots => {
+                    console.log("POSSIBLE TIME SLOTS: ", possibleTimeSlots)
+                    // Create new calendar event because everyone is free
+                    if (possibleTimeSlots[0].start === (new Date(startTime)).getTime()) {
+                      meetingEvent = {
                         'summary': title,
                         'location': pendingState.location,
                         'description': pendingState.description,
@@ -272,21 +280,28 @@ app.post('/slack/interactive', function(req, res) {
                             'dateTime': endTime
                         },
                         'attendees': attendees
-                    }
+                      }
 
-                    // Create and save new meeting to database
-                    let newMeeting = new Meeting({
-                        date: pendingState.date,
-                        startTime: startTime,
-                        invitees: attendees,
-                        userId: payload.user.id,
-                        subject: pendingState.description,
-                        location: pendingState.location,
-                        endTime: endTime,
-                        status: '',
-                        createdAt: new Date().toISOString()
-                    })
-                    return newMeeting.save()
+                      // Create and save new meeting to database
+                      newMeeting = new Meeting({
+                          date: pendingState.date,
+                          startTime: startTime,
+                          invitees: attendees,
+                          userId: payload.user.id,
+                          subject: pendingState.description,
+                          location: pendingState.location,
+                          endTime: endTime,
+                          status: '',
+                          createdAt: new Date().toISOString()
+                      })
+                      return newMeeting.save();
+                    }
+                    // Create dropdown menu of possible time slots for the user to choose from
+                    else {
+                      console.log("SOMEONE IS NOT FREE. OH NO.")
+                      // rtm.sendMessage("Oh no! Someone is busy at that time! Select from dropdown below", message.channel)
+                      
+                    }
                   })
                   .then(result => {
                     calendar.events.insert({
