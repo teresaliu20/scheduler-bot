@@ -255,7 +255,7 @@ app.post('/slack/interactive', function(req, res) {
 
                   Promise.all(findUserPromises)
                   .then(usersArray => {
-                    var availabilities = checkFreeBusy(usersArray, oauth2Client, calendar, startTime, endTime);
+                    var availabilities = findTimes(usersArray, oauth2Client, calendar, startTime, endTime);
                     usersArray.forEach(singleUser => {
                       attendees.push({
                         'email': singleUser.email

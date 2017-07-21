@@ -1,29 +1,65 @@
 function checkFreeBusy(userArray, auth, calendar, startTime, endTime) {
-  var availabilities = [];
-
   var authTokens = userArray.map((user) => (user.google));
-  // var oneWeekFromStart = (new Date(startTime)).getTime() + 1*24*60*60*1000;
+  var slot;
+  var oneWeekFromStart = (new Date(startTime)).getTime() + 1*24*60*60*1000;
+  var promisesArray = [];
+
   authTokens.forEach(token => {
     auth.setCredentials(token);
-    calendar.freebusy.query({
-      auth: auth,
-      headers: {"content-type": "application/json"},
-      resource: {
+    var promise = new Promise (
+      function(resolve, reject) {
+      calendar.freebusy.query({
+        auth: auth,
+        headers: {"content-type": "application/json"},
+        resource: {
           timeMin: startTime,
           timeMax: endTime,
           items: [{"id": "primary"}]
-      },
-    }, function(err, response) {
-      console.log("RESPONSE: ", response)
-      var events = response.calendars["primary"].busy;
-      if (events.length === 0) {
-          console.log("THIS PERSON IS NOT BUSY", events);
-      }
-      else {
-          console.log("THIS PERSON IS BUSY", events);
-      }
-    })
-  })
+        }
+      }, function(err, response){
+        if (err) {
+          reject(err);
+        }
+        else {
+          resolve(response.calendars["primary"].busy === 0);
+        }
+      })
+    }
+    );
+    promisesArray.push(promise);
+  });
+  return Promise.all(promisesArray);
+}
+
+// function checkFreeBusyAll(arrOfUsers, startTime, endTime){
+//   return new Promise(function(resolve, reject){
+//     var arrOfAuth =
+//     Promise.all()
+//   })
+// }
+
+function findTimes(userArray, auth, calendar, startTime, endTime) {
+
+  checkFreeBusy(auth, calendar, startTime, endTime)
+  .then()
+
+  var availabilities = [];
+  while (availabilities.length !== 10) {
+    var ok = true;
+    var slot;
+
+    checkFreeBusy(auth, calendar, startTime, endTime))
+    .then
+
+
+
+
+    if (ok) {
+      availabilities.push(Object.assign({}, {startTime, endTime}))
+    }
+    startTime = (new Date(startTime).getTime() + 30*60*1000).toISOString();
+    endTime = (new Date(endTime).getTime() + 30*60*1000).toISOString();
+  }
 }
 
 module.exports = {
