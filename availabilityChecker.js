@@ -1,5 +1,15 @@
 var _ = require('underscore');
 
+/**
+ * Checks the individual busy times of each invitee for the week using Google Calendar API checkFreeBusy
+ * and gives back a promise of all the queries from each user's calendars
+ * @param  {array}    userArray   Array of users invited to meeting from database
+ * @param  {object}   auth        Google OAuth2 Client object
+ * @param  {object}   calendar    Google calendar object
+ * @param  {Date}     startTime   Starting time of the meeting to be scheduled
+ * @return {promise}              Returns an array of promises that resolve with an array of objects
+ *                                containing invitee's busy times, with start and end as keys
+ */
 function checkFreeBusyForWeek(userArray, auth, calendar, startTime) {
   var authTokens = userArray.map((user) => (user.google)); // Map each user to their google auth object
   var oneWeekFromStart = (new Date(startTime)).getTime() + 7*24*60*60*1000; // Calculate one week from start time of meeting
@@ -31,7 +41,17 @@ function checkFreeBusyForWeek(userArray, auth, calendar, startTime) {
   });
   return Promise.all(promisesArray); // Return a promise of all the promises of the array
 }
-
+/**
+ * Combines all the busy times created by checkFreeBusy() and finds the times 
+ * that every invitee is available during that week, with a maximum of 3 time slots per day
+ * @param  {array}            userArray [description]
+ * @param  {object}           auth      [description]
+ * @param  {object}           calendar  [description]
+ * @param  {ISOSTring Date}   startTime [description]
+ * @param  {ISOSTring Date}   endTime   [description]
+ * @return {array}            Returns the array containing each time slot that works with everyone's
+ *                            schedule, represented by objects containing a start time and an end time    
+ */
 function checkAvailabilities(userArray, auth, calendar, startTime, endTime) {
   var possibleTimeSlots = [];
   // Checks the availability of each invitee for the whole week
