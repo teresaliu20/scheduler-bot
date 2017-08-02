@@ -63,6 +63,42 @@ var messageObject = {
   ]
 }
 
+var durationObject = {
+    "text": "How long would you like to have your meeting?",
+    "response_type": "in_channel",
+    "attachments": [
+        {
+            "text": "Select how long you would like your meeting",
+            "fallback": "If you could read this message, the user is selecting the duration of the meeting.",
+            "color": "#3AA3E3",
+            "attachment_type": "default",
+            "callback_id": "duration_selection",
+            "actions": [
+                {
+                    "name": "duration_list",
+                    "text": "Choose a length of time",
+                    "type": "select",
+                    "options": [
+                        {
+                            "text": "15 minutes",
+                            "value": "15"
+                        },
+                        {
+                            "text": "30 minutes",
+                            "value": "30"
+                        },
+                        {
+                          "text": "45 minutes",
+                          "value": "45"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+
+
 function meetOrRemind(data, message, user){
   if (JSON.parse(user.pendingState).invitees.length === 0 && data.result.action === "meeting:add") {
     rtm.sendMessage("With whom do you want to meet?", message.channel);
@@ -101,6 +137,10 @@ function meetOrRemind(data, message, user){
     user.save()
     .then(savedUser => {
       web.chat.postMessage(message.channel, meetingResponse(data.result.parameters, savedUser), messageObject);
+      console.log('duration', data.result.parameters);
+      if (data.result.parameters.duration !== '') {
+        web.chat.postMessage(message.channel, "How long?", durationObject);b
+      }
     })
     .catch(err => console.log("ERROR: ", err))
   }
