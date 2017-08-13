@@ -18,6 +18,9 @@ Scheduler Bot is a Slack bot that plans meetings and reminders for slack teams. 
 - Node.js and Express.js
 
 ## Screenshots
+#### Google authentication to link new users to their Google Accounts
 <img width="679" alt="screen shot 2017-08-03 at 10 01 51 am" src="https://user-images.githubusercontent.com/22362476/29253655-03979d8a-8038-11e7-80d8-636510796578.png">
-<img width="678" alt="screen shot 2017-08-03 at 10 02 29 am" src="https://user-images.githubusercontent.com/22362476/29253656-039adb4e-8038-11e7-9645-90e63e1a5158.png">
+#### Creating a meeting with natural conversation, processed through API.AI
 <img width="681" alt="screen shot 2017-08-03 at 10 02 40 am" src="https://user-images.githubusercontent.com/22362476/29253657-039cf046-8038-11e7-95c5-072a6c277094.png">
+#### Breakdown of conversation to make sure essential details of meeting are in place to create Google Calendar event
+<img width="678" alt="screen shot 2017-08-03 at 10 02 29 am" src="https://user-images.githubusercontent.com/22362476/29253656-039adb4e-8038-11e7-9645-90e63e1a5158.png">
